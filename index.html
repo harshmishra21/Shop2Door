@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      if (window.location.protocol === 'file:') {
+        window.location.replace('http://localhost:3002/');
+      }
+    </script>
+    <title>Shop2Door — Local help, thoughtfully matched</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="auth-mode">
+    <div id="auth-root" class="auth-root"></div>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#"><span class="brand-mark"><i></i><i></i><i></i></span>shop2door</a>
+        <div class="workspace-label">YOUR SPACE</div>
+        <div class="role-switch" aria-label="Select workspace">
+          <button class="role active" data-role="customer"><span class="role-icon">⌂</span> Customer</button>
+          <button class="role" data-role="partner"><span class="role-icon">↗</span> Partner</button>
+          <button class="role" data-role="admin"><span class="role-icon">⌘</span> Console</button>
+        </div>
+        <nav class="nav" id="main-nav">
+          <button class="nav-item active"><span>◈</span> Discover</button>
+          <button class="nav-item"><span>⌕</span> Browse services</button>
+          <button class="nav-item"><span>▣</span> My bookings <b>2</b></button>
+          <button class="nav-item"><span>◇</span> Wallet</button>
+          <button class="nav-item"><span>♧</span> Saved</button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="help-card"><span class="help-icon">?</span><div><strong>Need a hand?</strong><small>Our support team is here.</small></div><button aria-label="Open help">›</button></div>
+          <button class="account"><span class="avatar avatar-small">AM</span><span><strong>Armaan Mulani</strong><small>Member since 2024</small></span><i>⌄</i></button>
+          <button class="logout-button" data-signout><span>⇥</span>Sign out</button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button class="mobile-menu" aria-label="Menu">☰</button>
+          <button class="location"><span class="pin">⌖</span><span><small>YOUR LOCATION</small><strong>Andheri West, Mumbai</strong></span><i>⌄</i></button>
+          <div class="top-actions"><button class="icon-button mobile-logout" data-signout aria-label="Sign out">⇥</button><button class="icon-button" aria-label="Messages">◌<b></b></button><button class="icon-button" aria-label="Notifications">♧<b></b></button></div>
+        </header>
+
+        <section id="customer-view" class="view active">
+        </section>
+
+        <section id="partner-view" class="view partner-view">
+        </section>
+
+        <section id="admin-view" class="view admin-view">
+        </section>
+      </main>
+    </div>
+    <div id="toast" class="toast">Booking flow ready to continue</div>
+    <script src="app.js"></script>
+  </body>
+</html>
