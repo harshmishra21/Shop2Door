@@ -5,11 +5,45 @@ const views = { customer: $('#customer-view'), partner: $('#partner-view'), admi
 const nav = $('#main-nav');
 let role = 'customer', screen = 'home';
 
+function applyTheme(themeName = localStorage.getItem('shop2door-theme') || 'light') {
+  const isDark = themeName === 'dark';
+  document.body.classList.toggle('dark-mode', isDark);
+  document.body.setAttribute('data-theme', themeName);
+  const toggle = $('.theme-toggle');
+  if (toggle) {
+    toggle.textContent = isDark ? '☀' : '☾';
+    toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+  }
+}
+
 /* ---------------- API client + session ---------------- */
 let session = null;
 try { session = JSON.parse(sessionStorage.getItem('s2d-session') || 'null'); } catch (e) {}
 function saveSession() { sessionStorage.setItem('s2d-session', JSON.stringify(session)); }
 const viewOf = (r) => (r === 'user' ? 'customer' : r);
+const isLoopbackHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+const isCapacitor = !!(window.Capacitor || window.capacitor);
+
+// Priority: 1) Build-time inject, 2) User-configured (localStorage), 3) Auto-detect
+function resolveApiOrigin() {
+  if (window.__SHOP2DOOR_API_ORIGIN__) return window.__SHOP2DOOR_API_ORIGIN__;
+  const stored = localStorage.getItem('s2d-api-origin');
+  if (stored) return stored;
+  if (window.location.protocol === 'file:' || isCapacitor) {
+    return 'http://10.0.2.2:3001'; // Android emulator -> host machine
+  }
+  if (isLoopbackHost && Number(window.location.port) >= 5000) {
+    return 'http://localhost:3001'; // Vite/Live Server dev
+  }
+  return window.location.origin; // Production / same-origin
+}
+const apiOrigin = resolveApiOrigin();
+
+// Helper to override API origin at runtime (useful for testing)
+window.__shop2doorSetApiOrigin = (url) => {
+  localStorage.setItem('s2d-api-origin', url);
+  location.reload();
+};
 
 async function api(path, { method = 'GET', body = null } = {}) {
   let res;
@@ -17,7 +51,7 @@ async function api(path, { method = 'GET', body = null } = {}) {
     throw new Error('Open Shop2Door at the HTTP URL printed by `npm start`, not by opening index.html directly.');
   }
   try {
-    res = await fetch('/api' + path, {
+    res = await fetch(apiOrigin + '/api' + path, {
       method,
       headers: { 'Content-Type': 'application/json', ...(session && session.token ? { Authorization: 'Bearer ' + session.token } : {}) },
       body: body ? JSON.stringify(body) : undefined,
@@ -33,9 +67,9 @@ async function api(path, { method = 'GET', body = null } = {}) {
 
 /* ---------------- shared template helpers (design unchanged) ---------------- */
 const navs = {
-  customer: [['home', '◈', 'Discover'], ['search', '⌕', 'Search services'], ['bookings', '▣', 'My bookings', '2'], ['wallet', '◇', 'Wallet'], ['loyalty', '✦', 'Rewards'], ['support', '◌', 'Support'], ['profile', '♧', 'Profile']],
-  partner: [['dashboard', '◈', 'Dashboard'], ['requests', '▣', 'Booking requests', '4'], ['services', '⊞', 'My services'], ['availability', '◷', 'Availability'], ['earnings', '₹', 'Earnings'], ['profile', '♙', 'Profile'], ['kyc', '✓', 'Verification']],
-  admin: [['dashboard', '◈', 'Overview'], ['customers', '♙', 'Customers'], ['providers', '♜', 'Providers'], ['bookings', '▣', 'Bookings'], ['queries', '◌', 'Queries', '8'], ['complaints', '⚑', 'Complaints', '3'], ['social', '◎', 'Social complaints'], ['loyalty', '✦', 'Loyalty'], ['wallet', '◇', 'Wallet'], ['insights', '✦', 'AI insights'], ['reports', '↧', 'Reports & exports'], ['audit', '◷', 'Audit logs']]
+  customer: [['home', '◈', 'Discover'], ['search', '⌕', 'Search services'], ['bookings', '▣', 'My bookings'], ['wallet', '◇', 'Wallet'], ['loyalty', '✦', 'Rewards'], ['support', '◌', 'Support'], ['profile', '♧', 'Profile']],
+  partner: [['dashboard', '◈', 'Dashboard'], ['requests', '▣', 'Booking requests'], ['services', '⊞', 'My services'], ['availability', '◷', 'Availability'], ['earnings', '₹', 'Earnings'], ['profile', '♙', 'Profile'], ['kyc', '✓', 'Verification']],
+  admin: [['dashboard', '◈', 'Overview'], ['customers', '♙', 'Customers'], ['providers', '♜', 'Providers'], ['bookings', '▣', 'Bookings'], ['queries', '◌', 'Queries'], ['complaints', '⚑', 'Complaints'], ['social', '◎', 'Social complaints'], ['loyalty', '✦', 'Loyalty'], ['wallet', '◇', 'Wallet'], ['insights', '✦', 'AI insights'], ['reports', '↧', 'Reports & exports'], ['audit', '◷', 'Audit logs']]
 };
 const names = {
   customer: { search: ['Find a service', 'Search by service, task, or natural language.'], results: ['Electricians near Andheri West', '14 verified professionals available today.'], provider: ['Provider profile', 'Verified professional serving Andheri West.'], booking: ['Book your service', 'Choose the details for your visit.'], confirmation: ['Booking confirmed', 'Your appointment is safely booked.'], tracking: ['Track booking', 'Live status of your appointment.'], bookings: ['My bookings', 'Keep track of every appointment.'], wallet: ['Shop2Door wallet', 'Credits, refunds and payments in one place.'], loyalty: ['Your rewards', 'More bookings, better benefits.'], reviews: ['Rate your experience', 'Your feedback helps the community choose with confidence.'], support: ['Help & support', 'Find an answer or start a support request.'], complaint: ['Tell us what happened', 'We will route your request to the right specialist.'], profile: ['Your profile', 'Manage your account, addresses and preferences.'], recommendations: ['For you', 'Personalized suggestions based on your permitted activity.'] },
@@ -64,11 +98,16 @@ function nextDays(n = 5) {
   const out = [], now = new Date();
   for (let i = 0; i < n; i++) {
     const d = new Date(now); d.setDate(now.getDate() + i);
-    out.push({ dow: d.toLocaleDateString('en-GB', { weekday: 'short' }), num: String(d.getDate()).padStart(2, '0'), mon: d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase(), full: d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }) });
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    out.push({ iso, dow: d.toLocaleDateString('en-GB', { weekday: 'short' }), num: String(d.getDate()).padStart(2, '0'), mon: d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase(), full: d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }) });
   }
   return out;
 }
 function breakup(price) { const fee = Math.round(price * 0.097), gst = Math.round((price + fee) * 0.046); return { price, fee, gst, amount: price + fee + gst }; }
+function bookingCalendarParts(booking) {
+  const match = String(booking.dateLabel || '').match(/^[^,]+,\s*(\d{1,2})\s+([A-Za-z]+)/);
+  return { day: match ? match[1] : String(booking.dayNum || '').replace(/\D/g, ''), month: match ? match[2].slice(0, 3).toUpperCase() : String(booking.monthLabel || '').slice(0, 3).toUpperCase() };
+}
 function svgChart(vals, labels) {
   const W = 620, H = 210, pad = 8, max = Math.max(...vals, 1);
   const pts = vals.map((v, i) => [pad + (i * (W - pad * 2)) / (vals.length - 1), H - pad - (v / max) * (H - pad * 2)]);
@@ -100,6 +139,7 @@ async function customerHome() {
   ]);
   const pick = recs[0];
   const next = upcoming[0];
+  const nextCalendar = next ? bookingCalendarParts(next) : null;
   return `
   <div class="welcome-row"><div><p class="eyebrow">${todayLabel()}</p><h1>${greeting()}, ${esc(firstName())} <span>✦</span></h1><p class="subhead">What can we make easier today?</p></div><button class="voice-search">⌁ <span>Try voice search</span></button></div>
   <div class="search-wrap"><span>⌕</span><input id="service-search" placeholder="What service do you need?" value="${esc(lastQuery)}"/><kbd>⌘ K</kbd></div>
@@ -111,7 +151,7 @@ async function customerHome() {
   <section class="section providers-section"><div class="section-heading"><div><p class="eyebrow">TRUSTED NEAR YOU</p><h2>Popular professionals nearby</h2></div><button class="text-button" data-route="results">See all providers <span>→</span></button></div>
     <div class="provider-grid">${provs.slice(0, 3).map(providerCard).join('')}</div>
   </section>
-  ${next ? `<section class="booking-banner"><div class="booking-calendar"><small>${esc(next.monthLabel)}</small><strong>${esc(next.dayNum)}</strong></div><div><span class="status-dot"></span><small>UPCOMING BOOKING · ${esc((STATUS_LABEL[next.status] || '').toUpperCase())}</small><h3>${esc(next.serviceName)} with ${esc(next.providerName)}</h3><p>${esc(next.dateLabel)} · ${esc(next.timeLabel)} · Home</p></div><button class="outline-button" data-action="open-booking" data-id="${next.id}">View booking <span>→</span></button></section>` : ''}`;
+  ${next ? `<section class="booking-banner"><div class="booking-calendar"><small>${esc(nextCalendar.month)}</small><strong>${esc(nextCalendar.day)}</strong></div><div class="booking-banner-copy"><span class="status-dot"></span><small>UPCOMING BOOKING · ${esc((STATUS_LABEL[next.status] || '').toUpperCase())}</small><h3>${esc(next.serviceName)} with ${esc(next.providerName || next.partnerName || 'your partner')}</h3><p>${esc(next.dateLabel)} · ${esc(next.timeLabel)} · ${esc(next.address || 'Service address')}</p>${next.comments ? `<p class="booking-comments">Note: ${esc(next.comments)}</p>` : ''}</div><button class="outline-button" data-action="open-booking" data-id="${next.id}">View booking <span>→</span></button></section>` : ''}`;
 }
 
 function resultsQuery() {
@@ -148,7 +188,7 @@ async function customer(s) {
     const times = (p.slots || []).slice(0, 6);
     if (!times.includes(draft.time)) draft.time = times[0] || '10:30 AM';
     const t = breakup(svc.price);
-    return header('customer', s, `<div class="stepper"><span class="done">1<small>SERVICE</small></span><i></i><span class="active">2<small>TIME</small></span><i></i><span>3<small>LOCATION</small></span><i></i><span>4<small>PAYMENT</small></span><i></i><span>5<small>CONFIRM</small></span></div><div class="booking-layout"><div>${card('Choose a service', (p.services || []).filter((x) => x.active).map((x) => `<button class="service-option${x.id === svc.id ? ' selected' : ''}" data-action="pick-service" data-id="${x.id}"><div><h4>${esc(x.name)}</h4><p>${esc(x.detail)}</p></div><b>${inr(x.price)}</b></button>`).join(''))}${card('Choose a date', `<div class="date-list">${days.map((d, i) => `<button class="${draft.dateIdx === i ? 'active' : ''}" data-action="pick-date" data-i="${i}"><small>${i === 0 ? 'TODAY' : d.mon}</small><b>${d.num}</b><span>${d.dow}</span></button>`).join('')}</div><h3>Available times</h3><div class="time-grid">${times.map((x) => `<button class="${draft.time === x ? 'selected' : ''}" data-action="pick-time" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>`)}${card('Service address', `<div class="form-grid"><label class="form-field"><span>SAVED ADDRESS</span><input id="bk-address" value="${esc(draft.address)}"/></label></div><div class="form-grid" style="margin-top:12px">${['UPI', 'Card', 'Wallet'].map((m) => `<button class="filter${draft.payment === m ? ' active' : ''}" data-action="pick-pay" data-v="${m}">${m}</button>`).join('')}</div>`)}</div><aside class="booking-summary"><p class="eyebrow">YOUR BOOKING</p><h3>${esc(svc.name)}</h3><p>with ${esc(p.name)}</p><div><span>Service visit</span><b>${inr(t.price)}</b></div><div><span>Platform fee</span><b>${inr(t.fee)}</b></div><div><span>GST</span><b>${inr(t.gst)}</b></div><hr/><div class="total"><span>Total</span><b>${inr(t.amount)}</b></div><button class="primary-button" data-action="confirm-booking">Continue to payment <span>→</span></button><small>🔒 Secure payment · You will not be charged yet</small></aside></div>`);
+    return header('customer', s, `<div class="stepper"><span class="done">1<small>SERVICE</small></span><i></i><span class="active">2<small>TIME</small></span><i></i><span>3<small>LOCATION</small></span><i></i><span>4<small>PAYMENT</small></span><i></i><span>5<small>CONFIRM</small></span></div><div class="booking-layout"><div>${card('Choose a service', (p.services || []).filter((x) => x.active).map((x) => `<button class="service-option${x.id === svc.id ? ' selected' : ''}" data-action="pick-service" data-id="${x.id}"><div><h4>${esc(x.name)}</h4><p>${esc(x.detail)}</p></div><b>${inr(x.price)}</b></button>`).join(''))}${card('Choose a date', `<div class="date-list">${days.map((d, i) => `<button class="${draft.dateIdx === i ? 'active' : ''}" data-action="pick-date" data-i="${i}"><small>${i === 0 ? 'TODAY' : d.mon}</small><b>${d.num}</b><span>${d.dow}</span></button>`).join('')}</div><h3>Available times</h3><div class="time-grid">${times.map((x) => `<button class="${draft.time === x ? 'selected' : ''}" data-action="pick-time" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>`)}${card('Service address and instructions', `<div class="form-grid"><label class="form-field"><span>SAVED ADDRESS</span><input id="bk-address" value="${esc(draft.address)}"/></label></div><label class="form-field"><span>COMMENTS FOR THE PARTNER (OPTIONAL)</span><textarea id="bk-comments" maxlength="500" placeholder="For example: do not ring the bell; call when you arrive; please wear a mask.">${esc(draft.comments || '')}</textarea></label><div class="form-grid" style="margin-top:12px">${['UPI', 'Card', 'Wallet'].map((m) => `<button class="filter${draft.payment === m ? ' active' : ''}" data-action="pick-pay" data-v="${m}">${m}</button>`).join('')}</div>`)}</div><aside class="booking-summary"><p class="eyebrow">YOUR BOOKING</p><h3>${esc(svc.name)}</h3><p>with ${esc(p.name)}</p><div><span>Service visit</span><b>${inr(t.price)}</b></div><div><span>Platform fee</span><b>${inr(t.fee)}</b></div><div><span>GST</span><b>${inr(t.gst)}</b></div><hr/><div class="total"><span>Total</span><b>${inr(t.amount)}</b></div><button class="primary-button" data-action="confirm-booking">Continue to payment <span>→</span></button><small>🔒 Secure payment · You will not be charged yet</small></aside></div>`);
   }
   if (s === 'confirmation') {
     const b = lastBooking;
@@ -167,7 +207,7 @@ async function customer(s) {
   if (s === 'bookings') {
     const tabs = [['upcoming', 'Upcoming'], ['active', 'Active'], ['completed', 'Completed'], ['cancelled', 'Cancelled']];
     const list = await api('/bookings?tab=' + bookTab);
-    return header('customer', s, `<div class="tabs">${tabs.map(([k, l]) => `<button class="${bookTab === k ? 'active' : ''}" data-action="book-tab" data-v="${k}">${l}${k === 'upcoming' ? ` (${list.length})` : ''}</button>`).join('')}</div><div class="booking-list">${list.map((b) => `<article class="booking-item"><div class="booking-calendar"><small>${esc(b.monthLabel)}</small><strong>${esc(b.dayNum)}</strong></div><div><div>${statusBadge(b.status)} <small>${esc(b.code)}</small></div><h3>${esc(b.serviceName)}</h3><p>${esc(b.providerName)} · ${esc(b.dateLabel)} · ${esc(b.timeLabel)}</p></div><button class="outline-button" data-action="open-booking" data-id="${b.id}">View details</button></article>`).join('') || `<div class="state-inline"><span>◷</span><div><b>No ${bookTab} bookings</b><p>New bookings will appear here.</p></div></div>`}</div>`);
+    return header('customer', s, `<div class="tabs">${tabs.map(([k, l]) => `<button class="${bookTab === k ? 'active' : ''}" data-action="book-tab" data-v="${k}">${l}${k === 'upcoming' ? ` (${list.length})` : ''}</button>`).join('')}</div><div class="booking-list">${list.map((b) => { const calendar = bookingCalendarParts(b); return `<article class="booking-item"><div class="booking-calendar"><small>${esc(calendar.month)}</small><strong>${esc(calendar.day)}</strong></div><div><div>${statusBadge(b.status)} <small>${esc(b.code)}</small></div><h3>${esc(b.serviceName)}</h3><p>${esc(b.providerName)} · ${esc(b.dateLabel)} · ${esc(b.timeLabel)}</p></div><button class="outline-button" data-action="open-booking" data-id="${b.id}">View details</button></article>`; }).join('') || `<div class="state-inline"><span>◷</span><div><b>No ${bookTab} bookings</b><p>New bookings will appear here.</p></div></div>`}</div>`);
   }
   if (s === 'wallet') {
     const w = await api('/wallet');
@@ -223,7 +263,7 @@ async function partner(s) {
   }
   if (s === 'services') {
     const list = await api('/partner/services');
-    return header('partner', s, `<div class="toolbar"><button class="filter active">All services (${list.length})</button><button class="filter">Active</button><button class="filter">Paused</button></div><div class="service-manage">${list.map((x) => `<article class="manage-service"><div class="service-symbol">ϟ</div><div><h3>${esc(x.name)}</h3><p>${x.durationMin} min · Andheri West + 8 km</p></div><b>${inr(x.price)}</b>${badge(x.active ? 'Active' : 'Paused', x.active ? 'verified' : 'neutral')}<button class="outline-button" data-action="service-toggle" data-id="${x.id}">${x.active ? 'Pause' : 'Activate'}</button></article>`).join('')}</div>${card('Add a new service', `<div class="form-grid"><label class="form-field"><span>SERVICE NAME</span><input id="ns-name" placeholder="e.g. Geyser repair"/></label><label class="form-field"><span>PRICE (₹)</span><input id="ns-price" type="number" placeholder="499"/></label><label class="form-field"><span>DURATION (MIN)</span><input id="ns-duration" type="number" placeholder="45"/></label></div><button class="primary-button" data-action="service-add">Add service</button>`)}`);
+    return header('partner', s, `<div class="toolbar"><button class="filter active">All services (${list.length})</button><button class="filter">Active</button><button class="filter">Paused</button></div><div class="service-manage">${list.map((x) => `<article class="manage-service"><div class="service-symbol">ϟ</div><div><h3>${esc(x.name)}</h3><p>${x.durationMin} min · Mumbai</p></div><b>${inr(x.price)}</b>${badge(x.active ? 'Active' : 'Paused', x.active ? 'verified' : 'neutral')}<button class="outline-button" data-action="service-toggle" data-id="${x.id}">${x.active ? 'Pause' : 'Activate'}</button><button class="text-button danger" data-action="service-delete" data-id="${x.id}">Remove</button></article>`).join('')}</div>${card('Add a new service', `<div class="form-grid"><label class="form-field"><span>SERVICE NAME</span><input id="ns-name" placeholder="e.g. Geyser repair"/></label><label class="form-field"><span>PRICE (₹)</span><input id="ns-price" type="number" placeholder="499"/></label><label class="form-field"><span>DURATION (MIN)</span><input id="ns-duration" type="number" placeholder="45"/></label></div><button class="primary-button" data-action="service-add">Add service</button>`)}`);
   }
   if (s === 'availability') {
     const a = await api('/partner/availability');
@@ -247,7 +287,7 @@ async function partner(s) {
 
 /* ================= ADMIN ================= */
 async function admin(s) {
-  const columns = { customers: ['Customer', 'Location', 'Bookings', 'Total spend', 'Tier', 'Last activity', 'Status'], providers: ['Provider', 'Category', 'Verification', 'Rating', 'Jobs', 'Availability', 'Status'], bookings: ['Booking ID', 'Customer', 'Service', 'Provider', 'Time', 'Amount', 'Status'], wallet: ['Transaction ID', 'Customer', 'Type', 'Amount', 'Date', 'Reason', 'Status'], audit: ['Timestamp', 'User', 'Role', 'Action', 'Resource', 'Result'] };
+  const columns = { customers: ['Customer', 'Location', 'Bookings', 'Total spend', 'Tier', 'Last activity', 'Status'], providers: ['Provider', 'Category', 'Verification', 'Rating', 'Jobs', 'Availability', 'Status'], bookings: ['Booking ID', 'Customer', 'Service', 'Partner', 'Comments', 'Time', 'Amount', 'Status'], wallet: ['Transaction ID', 'Customer', 'Type', 'Amount', 'Date', 'Reason', 'Status'], audit: ['Timestamp', 'User', 'Role', 'Action', 'Resource', 'Result'] };
   if (s === 'dashboard') {
     const [o, complaints] = await Promise.all([api('/admin/overview'), api('/admin/complaints')]);
     return `<div class="admin-header"><div><p class="eyebrow">MARKETPLACE OVERVIEW</p><h1>${greeting()}, ${esc(firstName())}</h1><p class="subhead">Here's how Shop2Door is moving today.</p></div><div class="admin-head-actions"><button class="outline-button" data-route="reports">Export report</button><button class="primary-button" data-route="bookings">View live operations</button></div></div>
@@ -259,7 +299,7 @@ async function admin(s) {
     const rows = await api('/admin/' + s);
     const cell = (t, r) => t === 'customers' ? [r.name, r.location, r.bookings, r.spend, r.tier, r.lastActivity, badge(r.status, r.status === 'Active' ? 'verified' : 'medium')]
       : t === 'providers' ? [r.name, r.category, badge(r.verification, r.verification === 'Verified' ? 'verified' : 'medium'), r.rating, r.jobs, r.availability, badge(r.status, r.status === 'Active' ? 'verified' : 'medium')]
-      : t === 'bookings' ? [r.code, r.customer, r.service, r.provider, r.time, r.amount, statusBadge(r.status)]
+      : t === 'bookings' ? [r.code, r.customer, r.service, r.provider, esc(r.comments || '—'), r.time, r.amount, statusBadge(r.status)]
       : t === 'wallet' ? [r.id, r.customer, r.type, r.amount, r.date, r.reason, badge(r.status, 'verified')]
       : [r.at, r.user, r.role, r.action, r.resource, badge(r.result, 'verified')];
     return header('admin', s, `<div class="list-toolbar"><div class="inbox-search">⌕ Search ${s}</div><div><button class="filter">Filter ⌄</button><button class="filter">Sort ⌄</button></div></div>${table(columns[s], rows.map((r) => [...cell(s, r), `<button class="text-button" data-action="noop">Open</button>`]))}`);
@@ -344,11 +384,6 @@ function restore() {
 
 /* ================= auth UI (design unchanged) ================= */
 const authRoot = $('#auth-root');
-const demoUsers = {
-  user: { email: 'demouser@mail.com', pass: 'demo1234' },
-  partner: { email: 'demopart@mail.com', pass: 'demo1234' },
-  admin: { email: 'demoadmin@mail.com', pass: 'demo1234' },
-};
 let authMode = 'login', authTab = 'user';
 const authCopy = {
   login: { eyebrow: 'WELCOME BACK', title: 'Sign in to your space', sub: 'Choose your space and continue where you left off.', sw: 'New to Shop2Door?', swLabel: 'Create account' },
@@ -372,7 +407,7 @@ function renderAuth(mode) {
       <label class="auth-field"><span>PASSWORD</span><span class="auth-pass"><input id="auth-pass" type="password" placeholder="Enter your password" autocomplete="current-password"/><button type="button" class="auth-eye" data-auth="eye">SHOW</button></span></label>
       <div class="auth-row"><label class="auth-check"><input type="checkbox" checked/><span>Remember me</span></label><button type="button" class="text-button" data-auth="forgot">Forgot password?</button></div>
       <button class="primary-button auth-submit" type="submit">Sign in <span>→</span></button>` : `
-      <label class="auth-field partner-only"><span>BUSINESS NAME</span><input id="auth-business" placeholder="Rahul Electrical Services"/></label>
+      <label class="auth-field partner-only"><span>BUSINESS NAME</span><input id="auth-business" placeholder="Your business name"/></label>
       <label class="auth-field"><span>FULL NAME</span><input id="auth-name" placeholder="Armaan Mulani"/></label>
       <label class="auth-field"><span>EMAIL ADDRESS</span><input id="auth-email" type="email" placeholder="you@example.com" autocomplete="email"/></label>
       <label class="auth-field"><span>MOBILE NUMBER</span><input id="auth-mobile" type="tel" placeholder="+91 98765 43210" autocomplete="tel"/></label>
@@ -380,7 +415,7 @@ function renderAuth(mode) {
       <label class="auth-check"><input id="auth-terms" type="checkbox"/><span>I agree to the <a href="#" data-auth="terms">Terms of use</a> and <a href="#" data-auth="terms">Privacy policy</a></span></label>
       <button class="primary-button auth-submit" type="submit">Create account <span>→</span></button>`}
     </form>
-    ${login ? `<div class="auth-hint" id="auth-hint"></div>` : `<div class="auth-note"><span>✦</span><span id="auth-note-text"></span></div>`}
+    ${login ? '' : `<div class="auth-note"><span>✦</span><span id="auth-note-text"></span></div>`}
     <p class="auth-switch">${c.sw} <button type="button" class="text-button" data-auth="${login ? 'register' : 'login'}">${c.swLabel}</button></p>
     <div class="auth-foot"><span>🔒 Secure by design</span><span>✓ Verified professionals</span><span>◈ Shop2Door 2026</span></div>
   </div></div><aside class="auth-art"><div class="auth-glow"></div><div class="orb orb-one"></div><div class="orb orb-two"></div><div class="sparkle s1">✦</div><div class="sparkle s2">✦</div>
@@ -394,10 +429,7 @@ function renderAuth(mode) {
 function setAuthTab(k) {
   authTab = k;
   $$('#auth-tabs .auth-tab').forEach((b) => b.classList.toggle('active', b.dataset.authTab === k));
-  if (authMode === 'login') {
-    const u = demoUsers[k];
-    $('#auth-hint').innerHTML = `<p><span class="hl">${authRoles[k].toUpperCase()} DEMO ACCOUNT</span><span class="k">EMAIL</span><span class="v">${u.email}</span><span class="k">PASSWORD</span><span class="v">${u.pass}</span></p><button type="button" class="hint-fill" data-auth="fill">Autofill</button>`;
-  } else {
+  if (authMode !== 'login') {
     $$('.partner-only').forEach((x) => x.classList.toggle('auth-hidden', k !== 'partner'));
     $('#auth-note-text').textContent = k === 'partner' ? 'List your services, accept bookings and grow your business.' : 'Book trusted local professionals and manage everything in one place.';
   }
@@ -414,9 +446,7 @@ async function handleLogin() {
     const { token, user } = await api('/auth/login', { method: 'POST', body: { email, password: pass } });
     signIn({ token, user }, `Welcome back, ${user.name.split(' ')[0]}`);
   } catch (e) {
-    const u = Object.values(demoUsers).find((d) => d.email === email.toLowerCase());
-    authFail(!email ? 'Email required' : !pass ? 'Password required' : !u ? 'Account not found' : 'Incorrect password',
-      e.message.includes('Backend unreachable') ? e.message : !u ? 'No account matches this email. Try one of the demo accounts below.' : 'That password does not match. Use Autofill to insert the demo password.');
+    authFail(!email ? 'Email required' : !pass ? 'Password required' : 'Sign in failed', e.message.includes('Backend unreachable') ? e.message : e.message);
   }
 }
 async function handleRegister() {
@@ -468,13 +498,21 @@ authRoot.addEventListener('click', (e) => {
   const k = a.dataset.auth;
   if (k === 'login' || k === 'register') renderAuth(k);
   else if (k === 'eye') { const i = $('#auth-pass'); i.type = i.type === 'password' ? 'text' : 'password'; a.textContent = i.type === 'password' ? 'SHOW' : 'HIDE'; }
-  else if (k === 'fill') { const u = demoUsers[authTab]; $('#auth-email').value = u.email; $('#auth-pass').value = u.pass; clearAuthError(); }
-  else if (k === 'forgot') flash('Password reset is disabled in this demo — use the demo credentials below.');
-  else if (k === 'terms') flash('Legal pages are not part of this demo.');
+  else if (k === 'forgot') flash('Password reset is not configured yet. Contact an administrator.');
+  else if (k === 'terms') flash('Please review the terms with your administrator.');
 });
 authRoot.addEventListener('submit', (e) => { e.preventDefault(); authMode === 'login' ? handleLogin() : handleRegister(); });
 
 document.addEventListener('click', async (e) => {
+  const themeToggle = e.target.closest('[data-theme-toggle]');
+  if (themeToggle) {
+    e.preventDefault();
+    const nextTheme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
+    localStorage.setItem('shop2door-theme', nextTheme);
+    applyTheme(nextTheme);
+    flash(nextTheme === 'dark' ? 'Dark mode enabled' : 'Light mode enabled');
+    return;
+  }
   const so = e.target.closest('[data-signout]');
   if (so) { e.preventDefault(); signOut(); return; }
   const t = e.target.closest('[data-route]');
@@ -493,12 +531,12 @@ document.addEventListener('click', async (e) => {
     if (k === 'do-search') { const inp = $('#service-search'); lastQuery = inp ? inp.value.trim() : ''; return draw('results'); }
     if (k === 'open-category') { lastQuery = a.dataset.q || ''; $$('.category').forEach((x) => x.classList.toggle('selected', x === a)); filters = { availableToday: false, verified: false, topRated: false, under500: false, maxDistance: 0 }; return draw('results'); }
     if (k === 'open-provider') { providerId = id; return draw('provider'); }
-    if (k === 'book-provider') { const p = await api('/providers/' + id); const days = nextDays(); draft = { providerId: id, serviceId: (p.services.find((x) => x.active) || p.services[0] || {}).id, dateIdx: 1, dateLabel: days[1].full, dayNum: days[1].num, time: (p.slots || [])[0] || '10:30 AM', address: 'Home · 14B, Shantivan, Andheri West', payment: 'UPI' }; return draw('booking'); }
+    if (k === 'book-provider') { const p = await api('/providers/' + id); const days = nextDays(); draft = { providerId: id, serviceId: (p.services.find((x) => x.active) || p.services[0] || {}).id, dateIdx: 1, dateValue: days[1].iso, dateLabel: days[1].full, dayNum: days[1].num, time: (p.slots || [])[0] || '10:30 AM', address: 'Home · 14B, Shantivan, Andheri West', payment: 'UPI' }; return draw('booking'); }
     if (k === 'pick-service') { draft.serviceId = id; return draw('booking', false); }
-    if (k === 'pick-date') { const days = nextDays(); draft.dateIdx = Number(a.dataset.i); draft.dateLabel = days[draft.dateIdx].full; draft.dayNum = days[draft.dateIdx].num; return draw('booking', false); }
+    if (k === 'pick-date') { const days = nextDays(); draft.dateIdx = Number(a.dataset.i); draft.dateValue = days[draft.dateIdx].iso; draft.dateLabel = days[draft.dateIdx].full; draft.dayNum = days[draft.dateIdx].num; return draw('booking', false); }
     if (k === 'pick-time') { draft.time = v; return draw('booking', false); }
     if (k === 'pick-pay') { draft.payment = v; return draw('booking', false); }
-    if (k === 'confirm-booking') { const addrInp = $('#bk-address'); if (addrInp && addrInp.value.trim()) draft.address = addrInp.value.trim(); lastBooking = await api('/bookings', { method: 'POST', body: { providerId: draft.providerId, serviceId: draft.serviceId, dateLabel: draft.dateLabel, timeLabel: draft.time, address: draft.address, payment: draft.payment } }); trackId = lastBooking.id; draft = null; refreshCounts(); return draw('confirmation'); }
+    if (k === 'confirm-booking') { const addrInp = $('#bk-address'); const commentsInp = $('#bk-comments'); if (addrInp && addrInp.value.trim()) draft.address = addrInp.value.trim(); draft.comments = commentsInp ? commentsInp.value.trim() : ''; lastBooking = await api('/bookings', { method: 'POST', body: { providerId: draft.providerId, serviceId: draft.serviceId, dateValue: draft.dateValue, dateLabel: draft.dateLabel, timeLabel: draft.time, address: draft.address, comments: draft.comments, payment: draft.payment } }); trackId = lastBooking.id; draft = null; refreshCounts(); return draw('confirmation'); }
     if (k === 'open-booking') { trackId = id; return draw('tracking'); }
     if (k === 'cancel-booking') { await api(`/bookings/${id}/cancel`, { method: 'POST' }); refreshCounts(); flash('Booking cancelled — refund credited to wallet.'); return draw('bookings'); }
     if (k === 'book-tab') { bookTab = v; return draw('bookings', false); }
@@ -518,6 +556,7 @@ document.addEventListener('click', async (e) => {
     if (k === 'job-decline') { await api(`/partner/jobs/${id}/decline`, { method: 'POST' }); refreshCounts(); flash('Request declined.'); return draw('requests'); }
     if (k === 'service-add') { await api('/partner/services', { method: 'POST', body: { name: $('#ns-name').value, price: $('#ns-price').value, durationMin: $('#ns-duration').value } }); flash('Service added.'); return draw('services', false); }
     if (k === 'service-toggle') { const cur = a.textContent.trim(); await api('/partner/services/' + id, { method: 'PATCH', body: { active: cur === 'Activate' } }); flash(cur === 'Activate' ? 'Service activated.' : 'Service paused.'); return draw('services', false); }
+    if (k === 'service-delete') { if (!window.confirm('Remove this service?')) return; await api('/partner/services/' + id, { method: 'DELETE' }); flash('Service removed.'); return draw('services', false); }
     if (k === 'avail-toggle') { const cur = await api('/partner/availability'); await api('/partner/availability', { method: 'PATCH', body: { open: !cur.open } }); flash(!cur.open ? 'You are now available for jobs.' : 'New bookings paused.'); return draw(screen, false); }
     if (k === 'day-toggle') { const cur = await api('/partner/availability'); const sched = (cur.schedule || []).map((d) => d.day === v ? { ...d, open: !d.open, from: !d.open ? '9:00 AM' : 'Unavailable', to: !d.open ? '7:00 PM' : '' } : d); await api('/partner/availability', { method: 'PATCH', body: { schedule: sched } }); return draw('availability', false); }
     if (k === 'partner-profile-save') { await api('/partner/profile', { method: 'PATCH', body: { businessName: $('#pf-biz').value, area: $('#pf-area').value } }); applyAccess(); flash('Business profile updated.'); return draw('profile', false); }
@@ -541,6 +580,7 @@ document.addEventListener('keydown', (e) => {
 /* ================= boot ================= */
 window.addEventListener('hashchange', restore);
 (async function boot() {
+  applyTheme(localStorage.getItem('shop2door-theme') || 'light');
   if (session && session.token) {
     try {
       const me = await api('/auth/me');

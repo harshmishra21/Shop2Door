@@ -5,8 +5,21 @@ const db = require('./db');
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 
+// Allow the optional Live Server workflow on localhost:5500 to use this API.
+app.use((req, res, next) => {
+  const origin = req.headers.origin || '';
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+$/.test(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', db: db.isConnected() ? 'azure' : 'seed', time: new Date().toISOString() });
+  res.json({ status: 'ok', db: db.status(), time: new Date().toISOString() });
 });
 
 app.use('/api/auth', require('./routes/auth'));
@@ -22,7 +35,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(webRoot, 'index.html'));
 });
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 3001;
 
 // Start the server, automatically rolling to the next free port if the
 // requested one is already in use (e.g. another dev server on :3000),
@@ -30,7 +43,7 @@ const PORT = Number(process.env.PORT) || 3000;
 function listen(port, attemptsLeft = 10) {
   const server = app.listen(port, () => {
     if (port !== PORT) console.log(`[server] Port ${PORT} was busy — using ${port} instead.`);
-    console.log(`[server] Shop2Door backend on http://localhost:${port} (db: ${db.isConnected() ? 'azure' : 'seed'})`);
+    console.log(`[server] Shop2Door backend on http://localhost:${port} (db: ${db.status()})`);
   });
   server.on('error', (err) => {
     if (err && err.code === 'EADDRINUSE' && attemptsLeft > 0) {
@@ -42,4 +55,7 @@ function listen(port, attemptsLeft = 10) {
     }
   });
 }
-db.connect().then(() => listen(PORT));
+db.connect().then(() => listen(PORT)).catch((err) => {
+  console.error('[server] Database startup failed:', err.message);
+  process.exit(1);
+});

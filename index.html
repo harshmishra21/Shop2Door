@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       if (window.location.protocol === 'file:') {
-        window.location.replace('http://localhost:3002/');
+        window.location.replace('http://localhost:3001/');
       }
     </script>
     <title>Shop2Door — Local help, thoughtfully matched</title>
@@ -43,7 +43,13 @@
         <header class="topbar">
           <button class="mobile-menu" aria-label="Menu">☰</button>
           <button class="location"><span class="pin">⌖</span><span><small>YOUR LOCATION</small><strong>Andheri West, Mumbai</strong></span><i>⌄</i></button>
-          <div class="top-actions"><button class="icon-button mobile-logout" data-signout aria-label="Sign out">⇥</button><button class="icon-button" aria-label="Messages">◌<b></b></button><button class="icon-button" aria-label="Notifications">♧<b></b></button></div>
+          <div class="top-actions">
+            <button class="icon-button mobile-logout" data-signout aria-label="Sign out">⇥</button>
+            <button class="icon-button" aria-label="Messages">◌<b></b></button>
+            <button class="icon-button" aria-label="Notifications">♧<b></b></button>
+            <button class="icon-button profile-button" data-route="profile" aria-label="Open profile">◉</button>
+            <button class="icon-button theme-toggle" data-theme-toggle aria-label="Toggle dark mode">☾</button>
+          </div>
         </header>
 
         <section id="customer-view" class="view active">

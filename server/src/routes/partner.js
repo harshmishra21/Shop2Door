@@ -59,6 +59,11 @@ router.patch('/services/:id', onlyPartner, asyncH(async (req, res) => {
   res.json(await store.updateService(id, req.params.id, req.body || {}));
 }));
 
+router.delete('/services/:id', onlyPartner, asyncH(async (req, res) => {
+  const id = await pid(req, res); if (!id) return;
+  res.json(await store.removeService(id, req.params.id));
+}));
+
 router.get('/availability', onlyPartner, asyncH(async (req, res) => {
   const id = await pid(req, res); if (!id) return;
   res.json(await store.getAvailability(id));

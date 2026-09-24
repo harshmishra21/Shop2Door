@@ -1,4 +1,4 @@
-// Data-access layer. Every function prefers Azure SQL when connected,
+// Data-access layer. Every function prefers AWS RDS SQL Server when connected,
 // otherwise it operates on the in-memory seed copy. Same shapes either way.
 const db = require('./db');
 const seed = require('./seed');
@@ -110,7 +110,7 @@ async function searchProviders({ q = '', maxDistance = 0, maxPrice = 0, minRatin
       if (maxDistance && p.distanceKm > maxDistance) return false;
       if (maxPrice && p.priceFrom > maxPrice) return false;
       if (minRating && p.rating < minRating) return false;
-      if (availableToday && !(p.available && (p.slots || []).some((s) => s.startsWith('Today')))) return false;
+      if (availableToday && !(p.available && (p.slots || []).length)) return false;
       return true;
     })
     .sort((a, b) => a.distanceKm - b.distanceKm);
@@ -207,39 +207,52 @@ async function getBooking(id, userId) {
 
 const nowLabel = () => new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit' });
 
-async function createBooking(userId, { providerId, serviceId, dateLabel, timeLabel, address, payment }) {
+async function createBooking(userId, { providerId, serviceId, dateValue, dateLabel, timeLabel, address, comments, payment }) {
   const provider = await getProvider(providerId);
   if (!provider) { const e = new Error('Provider not found.'); e.code = 404; throw e; }
   const service = (provider.services || []).find((s) => s.id === serviceId) || (provider.services || []).find((s) => s.active) || provider.services[0];
   if (!service) { const e = new Error('This provider has no bookable services right now.'); e.code = 400; throw e; }
   const user = await findUserById(userId);
+  if (!user) { const e = new Error('Customer account not found.'); e.code = 404; throw e; }
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(String(dateValue || '')) ? String(dateValue) : '';
+  const dateText = String(dateLabel || '').replace(/^[^,]+,\s*/, '').trim();
+  const dateParts = dateText.match(/^(\d{1,2})\s+([A-Za-z]+)$/);
+  const bookingDate = isoDate
+    ? new Date(`${isoDate}T00:00:00`)
+    : dateParts ? new Date(`${dateParts[2]} ${dateParts[1]}, ${new Date().getFullYear()}`) : new Date(dateText);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (Number.isNaN(bookingDate.getTime()) || bookingDate < today) {
+    const e = new Error('Choose a valid future booking date.'); e.code = 400; throw e;
+  }
   const { price, fee, gst, amount } = breakdown(service.price);
   if (payment === 'Wallet' && (user.walletBalance || 0) < amount) {
     const e = new Error('Insufficient wallet balance for this booking.');
     e.code = 402;
     throw e;
   }
-  const dayNum = (dateLabel || '').split(' ')[0] || '';
+  const dayNum = String(dateLabel || '').replace(/^[^,]+,\s*/, '').split(' ')[0] || '';
+  const monthLabel = bookingDate.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase();
   const b = {
     id: nid('b'), code: 'BK-2026-' + Math.floor(1000 + Math.random() * 9000) + '-' + Math.floor(100 + Math.random() * 900),
-    userId, providerId, serviceId: service.id, serviceName: service.name,
-    monthLabel: 'SEP', dayNum, dateLabel: dateLabel || 'Saturday', timeLabel: timeLabel || provider.slots[0] || '10:00 AM',
-    address: address || 'Home', price, fee, gst, amount, status: 'pending',
+    userId, customerName: user.name, providerId, partnerName: provider.name, serviceId: service.id, serviceName: service.name,
+    monthLabel, dayNum, dateLabel: dateLabel || 'Saturday', timeLabel: timeLabel || provider.slots[0] || '10:00 AM',
+    address: address || 'Home', comments: String(comments || '').trim().slice(0, 500), price, fee, gst, amount, status: 'pending',
     payment: payment || 'UPI', createdAt: nowLabel(),
     history: [{ label: 'Booking requested', at: nowLabel() }],
   };
   if (useDb()) {
     await db.pool.request()
       .input('id', db.sql.NVarChar, b.id).input('code', db.sql.NVarChar, b.code)
-      .input('userId', db.sql.NVarChar, b.userId).input('providerId', db.sql.NVarChar, b.providerId)
+      .input('userId', db.sql.NVarChar, b.userId).input('customerName', db.sql.NVarChar, b.customerName)
+      .input('providerId', db.sql.NVarChar, b.providerId).input('partnerName', db.sql.NVarChar, b.partnerName)
       .input('serviceId', db.sql.NVarChar, b.serviceId).input('serviceName', db.sql.NVarChar, b.serviceName)
       .input('monthLabel', db.sql.NVarChar, b.monthLabel).input('dayNum', db.sql.NVarChar, b.dayNum)
       .input('dateLabel', db.sql.NVarChar, b.dateLabel).input('timeLabel', db.sql.NVarChar, b.timeLabel)
-      .input('address', db.sql.NVarChar, b.address).input('price', db.sql.Int, b.price)
+      .input('address', db.sql.NVarChar, b.address).input('comments', db.sql.NVarChar, b.comments).input('price', db.sql.Int, b.price)
       .input('fee', db.sql.Int, b.fee).input('gst', db.sql.Int, b.gst).input('amount', db.sql.Int, b.amount)
       .input('status', db.sql.NVarChar, b.status).input('payment', db.sql.NVarChar, b.payment)
       .input('createdAt', db.sql.NVarChar, b.createdAt).input('history', db.sql.NVarChar, J(b.history))
-      .query('INSERT INTO bookings (id,code,userId,providerId,serviceId,serviceName,monthLabel,dayNum,dateLabel,timeLabel,address,price,fee,gst,amount,status,payment,createdAt,history) VALUES (@id,@code,@userId,@providerId,@serviceId,@serviceName,@monthLabel,@dayNum,@dateLabel,@timeLabel,@address,@price,@fee,@gst,@amount,@status,@payment,@createdAt,@history)');
+      .query('INSERT INTO bookings (id,code,userId,customerName,providerId,partnerName,serviceId,serviceName,monthLabel,dayNum,dateLabel,timeLabel,address,comments,price,fee,gst,amount,status,payment,createdAt,history) VALUES (@id,@code,@userId,@customerName,@providerId,@partnerName,@serviceId,@serviceName,@monthLabel,@dayNum,@dateLabel,@timeLabel,@address,@comments,@price,@fee,@gst,@amount,@status,@payment,@createdAt,@history)');
   } else {
     mem.bookings.push(b);
   }
@@ -408,18 +421,42 @@ async function providerIdFor(userId) {
   return u ? u.providerId : null;
 }
 
+async function bookingJobFor(booking) {
+  const customer = await findUserById(booking.userId);
+  const customerName = customer ? customer.name : 'Customer';
+  const status = booking.status === 'pending' ? 'new' :
+    booking.status === 'confirmed' ? 'upcoming' :
+    booking.status === 'in_progress' ? 'active' :
+    booking.status === 'completed' ? 'completed' :
+    booking.status === 'declined' ? 'declined' :
+    booking.status === 'cancelled' ? 'cancelled' : 'new';
+  return {
+    id: booking.id,
+    providerId: booking.providerId,
+    kind: 'request',
+    customer: customerName,
+    customerMeta: booking.payment ? `${booking.payment} · ${booking.status}` : booking.status,
+    type: (booking.serviceName || 'SERVICE').toUpperCase(),
+    service: booking.serviceName || 'Service',
+    dateLabel: booking.dateLabel || 'Today',
+    timeLabel: booking.timeLabel || 'Flexible',
+    place: booking.address || 'Service address',
+    price: Number(booking.amount || 0),
+    status,
+    note: booking.comments || `Booking ${booking.code || booking.id}`,
+    payment: booking.payment || 'UPI',
+  };
+}
+
 async function allJobs() {
-  if (useDb()) {
-    const r = await db.pool.request().query('SELECT * FROM jobs');
-    return r.recordset;
-  }
-  return mem.jobs;
+  const bookings = (await allBookings()).map((b) => bookingJobFor(b));
+  return await Promise.all(bookings);
 }
 
 async function getDashboard(providerId) {
   const jobs = (await allJobs()).filter((j) => j.providerId === providerId);
-  const upcoming = jobs.filter((j) => j.kind === 'job' && j.status === 'upcoming');
-  const todayEarnings = upcoming.filter((j) => j.dateLabel === 'Today').reduce((s, j) => s + j.price, 0);
+  const upcoming = jobs.filter((j) => (j.kind === 'job' && j.status === 'upcoming') || (j.kind === 'request' && ['new', 'upcoming'].includes(j.status)));
+  const todayEarnings = upcoming.filter((j) => j.dateLabel === 'Today').reduce((s, j) => s + Number(j.price || 0), 0);
   const p = await getProvider(providerId);
   const av = await getAvailability(providerId);
   return {
@@ -444,13 +481,25 @@ async function listRequests(providerId, tab = 'new') {
 
 async function getJob(id, providerId) {
   const j = (await allJobs()).find((x) => x.id === id && x.providerId === providerId);
-  return j || null;
+  if (j) return j;
+  const booking = (await allBookings()).find((x) => x.id === id && x.providerId === providerId);
+  return booking ? bookingJobFor(booking) : null;
 }
 
 async function setJobStatus(id, providerId, status) {
   const allowed = ['upcoming', 'declined', 'in_progress', 'completed', 'cancelled'];
   if (!allowed.includes(status)) { const e = new Error('Invalid status.'); e.code = 400; throw e; }
-  const j = await getJob(id, providerId);
+  const booking = (await allBookings()).find((x) => x.id === id && x.providerId === providerId);
+  if (booking) {
+    const mapped = { upcoming: 'confirmed', declined: 'declined', in_progress: 'in_progress', completed: 'completed', cancelled: 'cancelled' }[status] || status;
+    booking.status = mapped;
+    if (useDb()) {
+      await db.pool.request().input('id', db.sql.NVarChar, id).input('status', db.sql.NVarChar, mapped)
+        .query('UPDATE bookings SET status=@status WHERE id=@id');
+    }
+    return bookingJobFor(booking);
+  }
+  const j = (await allJobs()).find((x) => x.id === id && x.providerId === providerId);
   if (!j) { const e = new Error('Job not found.'); e.code = 404; throw e; }
   j.status = status;
   if (useDb()) {
@@ -489,6 +538,18 @@ async function updateService(providerId, id, patch) {
   return s;
 }
 
+async function removeService(providerId, id) {
+  const list = await listServices(providerId);
+  if (!list.some((service) => service.id === id)) { const e = new Error('Service not found.'); e.code = 404; throw e; }
+  if (useDb()) {
+    await db.pool.request().input('id', db.sql.NVarChar, id).input('providerId', db.sql.NVarChar, providerId)
+      .query('DELETE FROM services WHERE id=@id AND providerId=@providerId');
+  } else {
+    mem.services = mem.services.filter((service) => service.id !== id);
+  }
+  return { ok: true, id };
+}
+
 async function getAvailability(providerId) {
   if (useDb()) {
     const r = await db.pool.request().input('pid', db.sql.NVarChar, providerId).query('SELECT * FROM availability WHERE providerId=@pid');
@@ -507,10 +568,10 @@ async function updateAvailability(providerId, patch) {
     const exists = await db.pool.request().input('pid', db.sql.NVarChar, providerId).query('SELECT providerId FROM availability WHERE providerId=@pid');
     if (exists.recordset.length) {
       await db.pool.request().input('pid', db.sql.NVarChar, providerId).input('open', db.sql.Bit, next.open ? 1 : 0).input('schedule', db.sql.NVarChar, J(next.schedule))
-        .query('UPDATE availability SET open=@open, schedule=@schedule WHERE providerId=@pid');
+        .query('UPDATE availability SET [open]=@open, schedule=@schedule WHERE providerId=@pid');
     } else {
       await db.pool.request().input('pid', db.sql.NVarChar, providerId).input('open', db.sql.Bit, next.open ? 1 : 0).input('note', db.sql.NVarChar, next.note).input('schedule', db.sql.NVarChar, J(next.schedule))
-        .query('INSERT INTO availability (providerId,open,note,schedule) VALUES (@pid,@open,@note,@schedule)');
+        .query('INSERT INTO availability (providerId,[open],note,schedule) VALUES (@pid,@open,@note,@schedule)');
     }
   } else {
     mem.availability[providerId] = next;
@@ -592,7 +653,7 @@ async function listBookingsAdmin() {
   for (const b of all) {
     const e = await enrichBooking(b);
     const u = await findUserById(b.userId);
-    out.push({ code: b.code, customer: u ? u.name : '—', service: b.serviceName, provider: e.providerName, time: `${b.dateLabel} · ${b.timeLabel}`, amount: '₹' + b.amount, status: b.status });
+    out.push({ code: b.code, customer: b.customerName || (u ? u.name : '—'), service: b.serviceName, provider: b.partnerName || e.providerName, comments: b.comments || '', time: `${b.dateLabel} · ${b.timeLabel}`, amount: '₹' + b.amount, status: b.status });
   }
   return out;
 }
@@ -727,7 +788,7 @@ module.exports = {
   getWallet, topupWallet, getLoyalty, redeemReward, submitReview,
   listTickets, createTicket, customerCounts,
   providerIdFor, getDashboard, listRequests, getJob, setJobStatus,
-  listServices, addService, updateService, getAvailability, updateAvailability,
+  listServices, addService, updateService, removeService, getAvailability, updateAvailability,
   getEarnings, updateProfile, partnerCounts,
   getOverview, listCustomers, listProviders, listBookingsAdmin, listWalletAdmin,
   listAudit, listTicketsAdmin, replyTicket, listComplaints, updateComplaint,

@@ -1,0 +1,2 @@
+[db] No AWS RDS config — running in SEED mode (dummy data served from backend).
+[server] Shop2Door backend on http://localhost:3001 (db: seed)

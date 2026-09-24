@@ -2,10 +2,12 @@
   "name": "shop2door-server",
   "version": "1.0.0",
   "private": true,
-  "description": "Shop2Door backend — Express API with Azure SQL, automatic fallback to built-in seed data",
+  "description": "Shop2Door backend — Express API with AWS RDS for SQL Server",
   "type": "commonjs",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "seed": "node src/bootstrap.js",
+    "reset-seed": "RESET_DATA=true node src/bootstrap.js"
   },
   "dependencies": {
     "express": "^4.19.2",

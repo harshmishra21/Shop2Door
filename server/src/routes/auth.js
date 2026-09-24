@@ -9,7 +9,7 @@ router.post('/login', asyncH(async (req, res) => {
   const { email, password } = req.body || {};
   const u = await store.findUserByEmail(email || '');
   if (!u || !verifyPassword(password || '', u.salt, u.passwordHash)) {
-    return res.status(401).json({ error: 'Invalid email or password. Try one of the demo accounts.' });
+    return res.status(401).json({ error: 'Invalid email or password.' });
   }
   const token = createSession(u);
   res.json({ token, user: store.publicUser(u) });

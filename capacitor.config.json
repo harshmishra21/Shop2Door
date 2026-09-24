@@ -1,0 +1,16 @@
+{
+  "appId": "com.shop2door.app",
+  "appName": "Shop2Door",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "buildOptions": {
+      "keystorePath": null,
+      "keystorePassword": null,
+      "keystoreAlias": null,
+      "keystoreAliasPassword": null
+    }
+  }
+}

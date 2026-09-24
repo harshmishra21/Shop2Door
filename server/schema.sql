@@ -1,6 +1,6 @@
--- Shop2Door — Azure SQL schema.
--- Run once against your Azure SQL database. The backend serves identical
--- dummy data automatically when this database is not connected.
+-- Shop2Door — AWS RDS for SQL Server schema.
+-- Run once against the RDS database. The backend serves identical seed data
+-- only when the application is running outside production.
 
 CREATE TABLE users (
   id NVARCHAR(32) PRIMARY KEY,
@@ -81,7 +81,9 @@ CREATE TABLE bookings (
   id NVARCHAR(32) PRIMARY KEY,
   code NVARCHAR(40) NOT NULL,
   userId NVARCHAR(32) NOT NULL,
+  customerName NVARCHAR(120) NOT NULL DEFAULT '',
   providerId NVARCHAR(32) NOT NULL,
+  partnerName NVARCHAR(160) NOT NULL DEFAULT '',
   serviceId NVARCHAR(32) NOT NULL DEFAULT '',
   serviceName NVARCHAR(160) NOT NULL DEFAULT '',
   monthLabel NVARCHAR(10) NOT NULL DEFAULT '',
@@ -89,6 +91,7 @@ CREATE TABLE bookings (
   dateLabel NVARCHAR(80) NOT NULL DEFAULT '',
   timeLabel NVARCHAR(40) NOT NULL DEFAULT '',
   address NVARCHAR(250) NOT NULL DEFAULT '',
+  comments NVARCHAR(500) NOT NULL DEFAULT '',
   price INT NOT NULL DEFAULT 0,
   fee INT NOT NULL DEFAULT 0,
   gst INT NOT NULL DEFAULT 0,
@@ -179,7 +182,7 @@ CREATE INDEX IX_jobs_provider ON jobs(providerId);
 
 CREATE TABLE availability (
   providerId NVARCHAR(32) PRIMARY KEY,
-  open BIT NOT NULL DEFAULT 1,
+  [open] BIT NOT NULL DEFAULT 1,
   note NVARCHAR(300) NOT NULL DEFAULT '',
   schedule NVARCHAR(MAX) NOT NULL DEFAULT '[]'
 );

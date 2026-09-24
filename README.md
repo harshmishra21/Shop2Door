@@ -4,7 +4,7 @@
 
 Shop2Door is a two-sided local-services marketplace prototype for discovering, booking, and managing trusted professionals. Customers can find nearby providers and book services, partners can manage their business operations, and administrators can oversee marketplace activity from one platform.
 
-> **Current status:** Working prototype with an Express API, responsive browser UI, Azure SQL support, and an in-memory seed-data fallback for local demonstrations.
+> **Current status:** Working prototype with an Express API, responsive browser UI, AWS RDS for SQL Server support, and an in-memory seed-data fallback for local demonstrations.
 
 ## Product At A Glance
 
@@ -23,14 +23,14 @@ Shop2Door is a two-sided local-services marketplace prototype for discovering, b
 - Admin operations workspace for marketplace oversight, support, complaints, reporting, and audit visibility.
 - Responsive layouts for desktop and mobile browsers.
 - Single-origin Express serving both the frontend and JSON API.
-- Azure SQL persistence with a development-friendly seed-mode fallback.
+- AWS RDS for SQL Server persistence with a development-friendly seed-mode fallback.
 
 ## Screenshots And Demo
 
 The application is designed to be run locally. Start the backend, then open the HTTP URL printed in the terminal. Do not open `index.html` directly with a `file://` URL because browser security policies do not allow the frontend to make same-origin API requests from that origin.
 
 ```text
-http://localhost:3000/
+http://localhost:3001/
 ```
 
 The server automatically tries the next available port if the configured port is already in use. Always use the URL printed by the server.
@@ -40,7 +40,7 @@ The server automatically tries the next available port if the configured port is
 - Node.js 18 or newer recommended
 - npm
 - A modern browser: Chrome, Safari, Edge, or Firefox
-- Azure SQL is optional for local development; the application uses seed data when Azure SQL configuration is absent
+- AWS RDS is optional for local development; the application uses seed data when RDS configuration is absent
 
 ## Quick Start
 
@@ -67,24 +67,16 @@ npm start
 You should see a message similar to:
 
 ```text
-[server] Shop2Door backend on http://localhost:3000 (db: seed)
+[server] Shop2Door backend on http://localhost:3001 (db: seed)
 ```
 
 ### 4. Open the application
 
 Open the printed HTTP address in your browser. The API and frontend are served from the same origin, so no separate frontend server or CORS configuration is required for the standard local setup.
 
-## Demo Accounts
+## Initial Accounts
 
-The prototype includes development-only demo accounts with autofill support on the login screen.
-
-| Role | Email | Password |
-| --- | --- | --- |
-| Customer | `demouser@mail.com` | `demo1234` |
-| Partner | `demopart@mail.com` | `demo1234` |
-| Admin | `demoadmin@mail.com` | `demo1234` |
-
-These credentials and seed records must be removed, rotated, or disabled before production deployment.
+The initial administrator, customer, and partner credentials are documented in [`cred.md`](cred.md). The sign-in page does not expose quick-login or autofill credentials.
 
 ## Project Structure
 
@@ -97,12 +89,12 @@ Shop2Door/
 ├── SRS.md                  # Detailed software requirements specification
 └── server/
     ├── package.json        # Backend scripts and dependencies
-    ├── schema.sql          # Azure SQL schema
+    ├── schema.sql          # AWS RDS for SQL Server schema
     ├── seed.js             # Development/demo data
     └── src/
         ├── index.js        # Express server and static frontend hosting
         ├── auth.js         # Password/session primitives
-        ├── db.js           # Azure SQL connection with seed fallback
+        ├── db.js           # AWS RDS connection with seed fallback
         ├── store.js        # Data-access and business operations
         └── routes/         # Auth, customer, partner, and admin APIs
 ```
@@ -112,32 +104,37 @@ Shop2Door/
 Without database variables, the server runs in seed mode:
 
 ```text
-[db] No Azure SQL config — running in SEED mode
+[db] No AWS RDS config — running in SEED mode
 ```
 
-To connect to Azure SQL, configure these environment variables before starting the server:
+To connect to AWS RDS for SQL Server, configure these environment variables before starting the server:
 
 ```bash
-export AZURE_SQL_USER="your-user"
-export AZURE_SQL_PASSWORD="your-password"
-export AZURE_SQL_SERVER="your-server.database.windows.net"
-export AZURE_SQL_DATABASE="shop2door"
-export PORT=3000
+export AWS_RDS_USER="shop2door_app"
+export AWS_RDS_PASSWORD="your-password"
+export AWS_RDS_HOST="your-db.xxxxxxxxxxxx.ap-south-1.rds.amazonaws.com"
+export AWS_RDS_DATABASE="shop2door"
+export AWS_RDS_PORT=1433
+export DB_REQUIRED=true
+export AWS_RDS_TRUST_SERVER_CERTIFICATE=false
+export PORT=3001
 npm start
 ```
+
+For a local RDS client certificate error (`unable to get local issuer certificate`), set `AWS_RDS_TRUST_SERVER_CERTIFICATE=true` for the one-time bootstrap command. Keep it `false` in production after configuring the AWS RDS CA certificate.
 
 Never commit credentials or `.env` files containing secrets. In a team or hosted environment, use the platform's secret manager instead of shell history or source control.
 
 ### Database setup
 
-1. Create an Azure SQL database.
+1. Create an Amazon RDS for SQL Server Express database.
 2. Run [`server/schema.sql`](server/schema.sql) against the database.
 3. Load approved initial catalog and operational data using the project seed process or an environment-specific migration.
-4. Start the server with the Azure SQL variables configured.
-5. Confirm the health endpoint reports `azure`:
+4. Start the server with the AWS RDS variables configured.
+5. Confirm the health endpoint reports `rds`:
 
 ```bash
-curl http://localhost:3000/api/health
+curl http://localhost:3001/api/health
 ```
 
 Example response shape:
@@ -145,10 +142,38 @@ Example response shape:
 ```json
 {
   "status": "ok",
-  "db": "azure",
+    "db": "rds",
   "time": "2026-09-12T00:00:00.000Z"
 }
 ```
+
+### Initial RDS data
+
+After running `server/schema.sql`, load the requested initial accounts, partners, services, and categories from the server directory:
+
+```bash
+AWS_RDS_HOST="your-rds-endpoint" \
+AWS_RDS_PORT=1433 \
+AWS_RDS_DATABASE="shop2door" \
+AWS_RDS_USER="your-user" \
+AWS_RDS_PASSWORD="your-password" \
+npm run seed
+```
+
+The command is idempotent for the initial records and creates 1 admin, 1 customer, 4 partners, and 20 services. Credentials are documented in [`cred.md`](cred.md).
+
+To remove all existing application rows first, then load only this initial dataset, run this once instead:
+
+```bash
+AWS_RDS_HOST="your-rds-endpoint" \
+AWS_RDS_PORT=1433 \
+AWS_RDS_DATABASE="shop2door" \
+AWS_RDS_USER="your-user" \
+AWS_RDS_PASSWORD="your-password" \
+npm run reset-seed
+```
+
+This clears application data but leaves the database schema intact. Do not run it after real customer data exists.
 
 ## API Overview
 
@@ -281,7 +306,7 @@ node --check server/src/store.js
 Check the running service:
 
 ```bash
-curl http://localhost:3000/api/health
+curl http://localhost:3001/api/health
 ```
 
 The repository currently has no automated test script configured. Production delivery should add unit, API integration, end-to-end, accessibility, security, and performance tests as described in [`SRS.md`](SRS.md).
@@ -290,8 +315,8 @@ The repository currently has no automated test script configured. Production del
 
 - **Frontend:** Static HTML, CSS, and browser JavaScript.
 - **Backend:** Node.js and Express.
-- **Persistence:** Azure SQL through the `mssql` driver.
-- **Development fallback:** In-memory copy of `seed.js` when Azure SQL is unavailable.
+- **Persistence:** AWS RDS for SQL Server through the `mssql` driver.
+- **Development fallback:** In-memory copy of `seed.js` when RDS is unavailable outside production.
 - **Authentication baseline:** Opaque in-memory bearer sessions and salted password hashing for the prototype.
 - **Serving model:** Express serves `/api` and the frontend from one origin.
 

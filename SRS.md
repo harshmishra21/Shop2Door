@@ -34,25 +34,8 @@ Shop2Door shall make local service help discoverable, trustworthy, bookable, and
 3. Reduce booking friction through a guided booking flow with date, time, address, payment method, and price breakdown.
 4. Give providers a focused workspace for requests, services, availability, jobs, profile, verification, and earnings.
 5. Give administrators operational visibility over customers, providers, bookings, support, complaints, wallet, loyalty, insights, exports, and audit activity.
-6. Establish a platform foundation that can move from seed/demo mode to Azure SQL-backed production mode without changing the public API contract.
+6. Establish a platform foundation that can move from seed/demo mode to AWS RDS for SQL Server-backed production mode without changing the public API contract.
 7. Protect personal, payment-related, support, and administrative data through least privilege, auditability, and data minimization.
-
-### 2.2 Success measures
-
-The production implementation should measure at least:
-
-- Customer registration-to-first-booking conversion.
-- Search-to-provider-profile conversion.
-- Provider response and acceptance rate.
-- Booking completion and cancellation rate.
-- Average time to provider response.
-- Support first-response and resolution time.
-- Repeat booking and loyalty participation.
-- Marketplace gross booking value and provider payout accuracy.
-- API availability, error rate, and p95 latency.
-- Security incidents, unauthorized access attempts, and audit coverage.
-
-Target values shall be agreed during product launch planning. The prototype does not currently establish production KPI thresholds.
 
 ## 3. Scope
 
@@ -72,7 +55,7 @@ Target values shall be agreed during product launch planning. The prototype does
 - Partner dashboards, booking request management, job actions, service management, availability, earnings, profile, and verification status.
 - Admin marketplace overview, operational lists, complaints, social complaints, ticket replies, loyalty management view, insights, reports/exports, and audit view.
 - REST-style JSON API served from the same Express origin as the web client.
-- Azure SQL persistence with in-memory seed fallback for development/demo use.
+- AWS RDS for SQL Server persistence with in-memory seed fallback for development/demo use.
 - Responsive browser experience for desktop and mobile layouts.
 
 ### 3.2 Out of scope unless separately approved
@@ -101,7 +84,7 @@ Out-of-scope items may be represented by prototype labels or buttons, but they m
 | Administrator | Privileged operations role | Govern marketplace activity, support, complaints, data, insights, and exports |
 | Support agent | Operational user acting through admin support tools | Review and reply to customer tickets |
 | Finance/operations staff | Business stakeholder using admin data | Reconcile wallet, booking, export, and marketplace activity |
-| Database operator | Technical operator | Provision and maintain Azure SQL and backup/restore processes |
+| Database operator | Technical operator | Provision and maintain AWS RDS and backup/restore processes |
 | Platform operator | Technical operator | Run the API, configure environment, monitor health, and manage releases |
 
 The current application models `user`, `partner`, and `admin`. A future production authorization model may split administrator and support-agent permissions into separate roles.
@@ -124,7 +107,7 @@ The current application models `user`, `partner`, and `admin`. A future producti
 - The server is Node.js CommonJS with Express and `mssql`.
 - Authentication tokens are opaque bearer tokens stored in an in-memory server map; tokens are lost on process restart and are not suitable as the final production session mechanism.
 - Passwords currently use SHA-256 with a per-user salt. Production must use a password KDF such as Argon2id, scrypt, or bcrypt with an approved work factor.
-- Azure SQL connection is optional. If required environment variables are absent or the connection fails, the store serves in-memory seed data.
+- AWS RDS connection is optional outside production. If required environment variables are absent or the connection fails, the store serves in-memory seed data.
 - The client stores its session object in browser `sessionStorage`.
 - The current server has no explicit CORS middleware. This is correct for the same-origin deployment and does not make a `file://` launch valid.
 - The current server automatically attempts subsequent ports when the configured port is in use. Production deployment should use a fixed managed port or reverse proxy contract.
@@ -133,7 +116,7 @@ The current application models `user`, `partner`, and `admin`. A future producti
 
 - Node.js runtime compatible with the server package.
 - Express runtime and `mssql` driver.
-- Azure SQL Database for durable persistence.
+- AWS RDS for SQL Server for durable persistence.
 - Browser with Fetch API, session storage, modern JavaScript, CSS, and ES module-free script support.
 - Approved image/font/CDN providers if external assets remain enabled.
 - Future payment, communication, KYC, maps, analytics, and observability providers as approved integrations.
@@ -161,50 +144,6 @@ The current application models `user`, `partner`, and `admin`. A future producti
 **UX-009** The interface shall support desktop and mobile layouts without horizontal page overflow, clipped primary actions, or overlapping content.
 
 **UX-010** The client shall escape user-controlled values before inserting them into HTML. A production implementation shall additionally adopt a restrictive Content Security Policy and avoid unsafe HTML construction where practical.
-
-### 6.2 Customer navigation
-
-The customer workspace shall provide access to:
-
-- Discover/home.
-- Search services.
-- Provider results and provider profile.
-- My bookings.
-- Wallet.
-- Rewards/loyalty.
-- Support.
-- Profile.
-- Recommendations where enabled.
-
-### 6.3 Partner navigation
-
-The partner workspace shall provide access to:
-
-- Dashboard.
-- Booking requests.
-- My services.
-- Availability.
-- Earnings.
-- Business profile.
-- Verification/KYC status.
-- Job details and actions.
-
-### 6.4 Admin navigation
-
-The admin workspace shall provide access to:
-
-- Marketplace overview.
-- Customers.
-- Providers.
-- Bookings.
-- Queries/support inbox.
-- App complaints.
-- Social complaints.
-- Loyalty management.
-- Wallet ledger.
-- AI insights.
-- Reports and exports.
-- Audit logs.
 
 ## 7. Functional Requirements
 
@@ -544,7 +483,7 @@ The current API is JSON over HTTP and is mounted under `/api`. The production AP
 
 ### 9.1 Core entities
 
-The current Azure SQL schema contains the following logical entities:
+The current AWS RDS for SQL Server schema contains the following logical entities:
 
 - `users`: identity, contact, role, password material, wallet summary, loyalty summary, and provider linkage.
 - `categories`: service category catalog and display metadata.
@@ -588,6 +527,94 @@ The current Azure SQL schema contains the following logical entities:
 | Internal | Operational metrics, non-sensitive provider performance | Role-limited access |
 | Confidential | Customer contact details, addresses, support messages, earnings | Least privilege, encryption, audit, masking |
 | Restricted | Password material, tokens, payment secrets, government ID, bank details | Never expose in normal API responses; strong encryption/tokenization and strict access |
+
+## Solution Architecture
+
+Shop2Door shall use a modular, same-origin web architecture for the initial release. The browser application communicates with the Express API over HTTPS. The API owns authentication, authorization, validation, business rules, state transitions, and data access. AWS RDS for SQL Server is the durable system of record in production; the in-memory seed provider is limited to local development and demonstrations.
+
+```mermaid
+flowchart TB
+	subgraph Clients[Client Layer]
+		Browser[Desktop or mobile browser\nHTML, CSS, JavaScript]
+	end
+
+	subgraph Edge[Delivery and Security Boundary]
+		TLS[HTTPS and security headers]
+		Static[Express static-file hosting\nindex.html, app.js, styles.css]
+	end
+
+	subgraph Application[Application Layer]
+		API[Express REST API\nJSON over HTTP]
+		Auth[Authentication and session service]
+		Access[Role and ownership authorization\nCustomer | Partner | Admin]
+		Validation[Request validation and error handling]
+		Domain[Domain services\nBookings | Wallet | Loyalty | Support | Marketplace]
+		Audit[Audit and operational event service]
+	end
+
+	subgraph Data[Persistence Layer]
+		Store[Data-access and repository layer]
+		SQL[(AWS RDS for SQL Server\nproduction system of record)]
+		Seed[(Seed data\nlocal/demo fallback only)]
+	end
+
+	subgraph Integrations[External Integrations - planned or configurable]
+		Payments[Payment gateway\nUPI, cards, refunds]
+		Messaging[Email, SMS, push, or WhatsApp]
+		KYC[KYC and background verification]
+		Maps[Maps, geocoding, and distance services]
+		Observability[Logs, metrics, traces, and alerting]
+	end
+
+	Browser -->|HTTPS requests| TLS
+	TLS --> Static
+	TLS --> API
+	API --> Auth
+	API --> Access
+	API --> Validation
+	Access --> Domain
+	Validation --> Domain
+	Domain --> Store
+	Domain --> Audit
+	Store -->|When configured| SQL
+	Store -->|Development only| Seed
+	Domain -.->|Payment intents and webhooks| Payments
+	Domain -.->|Notifications| Messaging
+	Domain -.->|Provider verification| KYC
+	Domain -.->|Service area and distance| Maps
+	API -.-> Observability
+	Auth -.-> Observability
+	Domain -.-> Observability
+```
+
+### Architecture responsibilities
+
+| Layer | Responsibility | Key constraints |
+|---|---|---|
+| Client | Render workspaces, collect input, call API, display loading/error/empty/success states | Must not calculate authoritative totals or enforce authorization by itself |
+| Delivery/security | Serve static assets and terminate or pass through HTTPS | Must prevent direct `file://` usage in normal operation and apply security headers |
+| API | Expose versioned JSON endpoints and consistent error contracts | Validate every request and avoid leaking internal errors |
+| Auth/access | Establish identity and enforce role plus resource ownership | Client-side hiding is never sufficient |
+| Domain services | Apply booking, payment, wallet, loyalty, support, and marketplace rules | Mutations must be transactional and idempotent where retry is possible |
+| Store/repository | Isolate persistence details from route handlers | AWS RDS is authoritative in production; seed fallback must be explicit |
+| Database | Persist identities, catalog, operations, financial, support, and audit records | Use migrations, constraints, indexes, backups, and encryption |
+| Integrations | Connect payments, notifications, KYC, maps, and observability | Use timeouts, retries, webhook verification, and failure reconciliation |
+
+### Primary request flow
+
+1. The browser loads static assets from the same HTTPS origin as the API.
+2. The browser sends a request with the authenticated session credential when required.
+3. Express routes the request to the appropriate role-protected endpoint.
+4. Authentication identifies the actor; authorization validates role and resource ownership.
+5. Request validation checks types, ranges, enums, lengths, and business preconditions.
+6. Domain logic performs the operation and coordinates external providers where enabled.
+7. The store executes parameterized database operations inside an appropriate transaction.
+8. An audit event is written for security-sensitive or business-critical mutations.
+9. The API returns a stable JSON response; asynchronous work is represented by a tracked status.
+
+### Deployment topology
+
+For the initial hosted deployment, the browser, Express application, and API may run behind one HTTPS reverse proxy or managed web service. AWS RDS shall remain private where possible and be reachable only through approved network controls. External integrations shall use secret-managed credentials and verified callback endpoints. Multiple application instances require a shared session store and shared observability pipeline; the current in-memory session map is suitable only for a single-process prototype.
 
 ## 10. Security and Privacy Requirements
 
@@ -640,7 +667,7 @@ The current Azure SQL schema contains the following logical entities:
 ### 11.2 Availability and resilience
 
 - **NFR-REL-001:** The production API shall define an availability target, recommended initial target 99.5% monthly excluding approved maintenance.
-- **NFR-REL-002:** Azure SQL shall have automated backups and tested restore procedures.
+- **NFR-REL-002:** AWS RDS shall have automated backups and tested restore procedures.
 - **NFR-REL-003:** A database outage shall produce a controlled degraded state. Seed fallback shall never silently activate in production where it could create data loss or inconsistent behavior.
 - **NFR-REL-004:** Booking, wallet, loyalty, and payment mutations shall be transactional and idempotent.
 - **NFR-REL-005:** Third-party failures shall use timeouts, retries with backoff where safe, circuit breaking where appropriate, and clear user-facing status.
@@ -773,7 +800,7 @@ The release shall not be accepted as a production marketplace until all of the f
 - Booking and wallet mutations are transactional, idempotent, and audited.
 - Payment behavior is integrated with an approved provider or explicitly disabled; demo wallet behavior is not presented as real payment.
 - Production authentication uses approved password and session security.
-- Azure SQL migrations, indexes, backups, restore, and monitoring are documented and tested.
+- AWS RDS migrations, indexes, backups, restore, and monitoring are documented and tested.
 - Seed mode is explicitly disabled or isolated from production.
 - API documentation and error contracts are published.
 - Accessibility and responsive acceptance criteria pass.
@@ -793,7 +820,7 @@ The release shall not be accepted as a production marketplace until all of the f
 - Partner dashboard, requests, jobs, services, availability, earnings, profile, and verification views are represented.
 - Admin overview, entity lists, support queries, complaints, loyalty, insights, exports, and audit views are represented.
 - API routes exist for the main customer, partner, and admin flows listed in this document.
-- Azure SQL schema and a seed fallback share the same store-layer API shape.
+- AWS RDS schema and a seed fallback share the same store-layer API shape.
 - The client has loading and error states, including retry behavior for screen rendering.
 
 ### 16.2 Required hardening or completion before production
@@ -809,7 +836,7 @@ The release shall not be accepted as a production marketplace until all of the f
 - Separate admin permissions into least-privilege roles.
 - Add full audit coverage, monitoring, alerting, backup/restore, and incident runbooks.
 - Add automated unit, API, end-to-end, security, accessibility, and performance tests.
-- Remove or gate demo account hints and seed data for production.
+- Keep only the approved initial accounts and bootstrap data; do not expose credentials or demo hints in the client.
 - Ensure the server does not silently fall back to seed data when production persistence is unavailable.
 - Replace hard-coded location, dates, sample labels, external demo images, and display-only values with configuration or live data.
 - Review external font/image dependencies for privacy, availability, licensing, caching, and CSP compatibility.
@@ -821,14 +848,14 @@ The release shall not be accepted as a production marketplace until all of the f
 1. Install server dependencies from `server/package.json`.
 2. Start the API from the `server` directory with `npm start`.
 3. Open the HTTP URL printed by the server, not the `index.html` file directly.
-4. Use seed mode only for local development/demo work when Azure SQL variables are absent.
+4. Use seed mode only for local development/demo work when AWS RDS variables are absent.
 
 ### 17.2 Production environment configuration
 
 The production deployment shall define and protect:
 
 - `PORT` or managed listener configuration.
-- Azure SQL server, database, user, and password through a secrets manager.
+- AWS RDS host, database, user, and password through a secrets manager.
 - Session/signing secrets.
 - Payment provider credentials.
 - Email/SMS/push credentials.
@@ -878,7 +905,7 @@ The production deployment shall define and protect:
 | Loyalty points | Non-cash reward units tracked in a customer activity ledger |
 | Ticket | A customer support case containing messages and operational status |
 | Complaint | An operational issue record, including app or social-channel complaints |
-| Seed mode | Development fallback in which built-in in-memory data is served without Azure SQL |
+| Seed mode | Development fallback in which built-in in-memory data is served without AWS RDS |
 | Idempotency | Guarantee that safely repeating the same request does not create duplicate effects |
 | IDOR | Insecure direct object reference, where changing an object ID bypasses ownership checks |
 | PII | Personally identifiable information |
@@ -888,17 +915,9 @@ The production deployment shall define and protect:
 
 ---
 
-## Appendix A: Baseline Demo Accounts
+## Appendix A: Initial Accounts
 
-The current non-production client exposes demo-account hints for:
-
-| Role | Email | Password |
-|---|---|---|
-| Customer | `demouser@mail.com` | `demo1234` |
-| Partner | `demopart@mail.com` | `demo1234` |
-| Admin | `demoadmin@mail.com` | `demo1234` |
-
-These credentials must be removed, rotated, or gated behind an explicit development-only configuration before production release.
+The initial account credentials are maintained in [`cred.md`](cred.md). Credentials must be rotated before production release.
 
 ## Appendix B: Requirements Status Convention
 
@@ -907,3 +926,26 @@ These credentials must be removed, rotated, or gated behind an explicit developm
 - **Open decision:** Requires product, legal, security, finance, or operations approval before implementation can be considered final.
 
 This SRS should be maintained alongside the approved BRD, SOW, API contract, database migration history, test plan, and release checklist. Changes to those artifacts should update requirement IDs and traceability rather than silently changing behavior.
+
+## Tech Stack
+
+| Area | Current/proposed technology | Use |
+|---|---|---|
+| Frontend | HTML5, CSS3, browser JavaScript | Responsive single-page application shell and role-based workspaces |
+| Frontend serving | Express static middleware | Serves the frontend from the same origin as the API |
+| Backend runtime | Node.js | Application runtime |
+| Backend framework | Express 4 | HTTP server, routing, JSON middleware, and static-file hosting |
+| API style | REST-style JSON over HTTP(S) | Client/server contract under `/api` |
+| Database | Amazon RDS for SQL Server Express | Durable production persistence |
+| Database driver | `mssql` for Node.js | Parameterized SQL Server access |
+| Development data | In-memory JavaScript seed data | Local/demo fallback when AWS RDS is not configured |
+| Authentication baseline | Opaque bearer sessions and salted password hashing | Current prototype authentication; replace with production-grade session and password controls before launch |
+| Production authentication | Recommended: secure HttpOnly SameSite cookies or an approved identity provider | Expiring, revocable, scalable session management |
+| Payments | Planned payment gateway for UPI/cards/refunds | Must be PCI-compliant and webhook-driven; not implemented as a live integration in the prototype |
+| Notifications | Planned email/SMS/push/WhatsApp provider | Booking, support, and operational notifications |
+| Provider verification | Planned KYC/background-check provider or controlled operations workflow | Partner identity and verification lifecycle |
+| Location services | Planned maps/geocoding/distance provider | Service-area validation, distance, and future location workflows |
+| Documentation | Markdown, Mermaid, OpenAPI to be added | SRS, architecture diagrams, and API contract documentation |
+| Quality tooling | Node syntax checks now; automated unit/API/E2E/security/accessibility/performance tooling required | Release validation and regression prevention |
+
+The stack is intentionally modest for the current prototype. Production adoption shall preserve the API and domain boundaries while adding durable sessions, schema validation, migrations, transactional workflows, observability, automated testing, and approved third-party integrations.

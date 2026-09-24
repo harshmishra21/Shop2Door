@@ -1,0 +1,17 @@
+{
+  "name": "shop2door-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "cap:init": "cap init \"Shop2Door\" \"com.shop2door.app\" --web-dir=.",
+    "cap:add:android": "cap add android",
+    "cap:copy": "cap copy android",
+    "cap:build:android": "cd android && ./gradlew assembleDebug",
+    "mobile:build": "npm run cap:copy && npm run cap:build:android"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/android": "^6.1.2"
+  }
+}

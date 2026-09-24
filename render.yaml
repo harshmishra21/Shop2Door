@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: shop2door-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_REQUIRED
+        value: "true"
+      - key: PORT
+        value: "10000"
+      # Add these in Render dashboard after creating the service:
+      # - key: AWS_RDS_USER
+      #   value: your-rds-user
+      # - key: AWS_RDS_PASSWORD
+      #   value: your-rds-password
+      # - key: AWS_RDS_HOST
+      #   value: your-db.xxxxxxxxxxxx.ap-south-1.rds.amazonaws.com
+      # - key: AWS_RDS_DATABASE
+      #   value: shop2door
+      # - key: AWS_RDS_PORT
+      #   value: "1433"
+      # - key: AWS_RDS_TRUST_SERVER_CERTIFICATE
+      #   value: "false"
