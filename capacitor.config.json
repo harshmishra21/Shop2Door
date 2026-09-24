@@ -1,7 +1,7 @@
 {
   "appId": "com.shop2door.app",
   "appName": "Shop2Door",
-  "webDir": ".",
+  "webDir": "www",
   "server": {
     "androidScheme": "https"
   },

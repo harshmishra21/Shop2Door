@@ -24,8 +24,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare web assets directory
+        run: |
+          mkdir -p www
+          cp index.html app.js styles.css www/
+          # Copy any other static assets if needed
+          cp -r server/node_modules/@capacitor 2>/dev/null || true
+
       - name: Initialize Capacitor
-        run: npx cap init "Shop2Door" "com.shop2door.app" --web-dir=.
+        run: npx cap init "Shop2Door" "com.shop2door.app" --web-dir=www
 
       - name: Add Android platform
         run: npx cap add android
