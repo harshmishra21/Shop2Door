@@ -3,7 +3,10 @@ const store = require('../store');
 const { authRequired } = require('../auth');
 
 const router = express.Router();
-const asyncH = (fn) => (req, res) => fn(req, res).catch((e) => res.status(e.code || 500).json({ error: e.message || 'Something went wrong.' }));
+const asyncH = (fn) => (req, res) => fn(req, res).catch((e) => {
+  const status = (typeof e.code === 'number' && e.code >= 100 && e.code < 600) ? e.code : 500;
+  res.status(status).json({ error: e.message || 'Something went wrong.' });
+});
 const onlyPartner = authRequired(['partner']);
 
 async function pid(req, res) {
