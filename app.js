@@ -23,10 +23,12 @@ function saveSession() { sessionStorage.setItem('s2d-session', JSON.stringify(se
 const viewOf = (r) => (r === 'user' ? 'customer' : r);
 const isLoopbackHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
 const isCapacitor = !!(window.Capacitor || window.capacitor);
+const capacitorServerUrl = (window.Capacitor?.config?.server?.url) || '';
 
-// Priority: 1) Build-time inject, 2) User-configured (localStorage), 3) Auto-detect
+// Priority: 1) Build-time inject, 2) Capacitor server.url, 3) User-configured (localStorage), 4) Auto-detect
 function resolveApiOrigin() {
   if (window.__SHOP2DOOR_API_ORIGIN__) return window.__SHOP2DOOR_API_ORIGIN__;
+  if (capacitorServerUrl) return capacitorServerUrl;
   const stored = localStorage.getItem('s2d-api-origin');
   if (stored) return stored;
   if (window.location.protocol === 'file:' || isCapacitor) {

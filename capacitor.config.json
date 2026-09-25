@@ -3,7 +3,8 @@
   "appName": "Shop2Door",
   "webDir": "www",
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "url": "https://shop2door.onrender.com"
   },
   "android": {
     "buildOptions": {
