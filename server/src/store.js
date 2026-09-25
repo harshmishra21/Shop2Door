@@ -214,8 +214,13 @@ async function updateOverdueBookings() {
     if (['pending', 'confirmed'].includes(b.status)) {
       const dateText = String(b.dateLabel || '').replace(/^[^,]+,\s*/, '').trim();
       const dateParts = dateText.match(/^(\d{1,2})\s+([A-Za-z]+)$/);
-      const bookingDate = dateParts ? new Date(`${dateParts[2]} ${dateParts[1]}, ${new Date().getFullYear()}`) : new Date(dateText);
-      if (!Number.isNaN(bookingDate.getTime()) && bookingDate < today) {
+      let bookingDate = null;
+      if (dateParts) {
+        bookingDate = new Date(`${dateParts[2]} ${dateParts[1]}, ${new Date().getFullYear()}`);
+      } else {
+        bookingDate = new Date(dateText);
+      }
+      if (bookingDate && !Number.isNaN(bookingDate.getTime()) && bookingDate < today) {
         b.status = 'due';
         b.history = [...(b.history || []), { label: 'Marked as due (past date)', at: nowLabel() }];
         if (useDb()) {

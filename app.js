@@ -262,7 +262,24 @@ async function partner(s) {
   if (s === 'requests') {
     const { list, counts } = await api('/partner/requests?tab=' + reqTab);
     const tabs = [['new', 'New requests'], ['upcoming', 'Upcoming'], ['active', 'Active'], ['completed', 'Completed'], ['due', 'Due']];
-    return header('partner', s, `<div class="tabs">${tabs.map(([k, l]) => `<button class="${reqTab === k ? 'active' : ''}" data-action="req-tab" data-v="${k}">${l} (${counts[k] || 0})</button>`).join('')}</div><div class="request-list">${list.map((j) => `<article class="request-card"><div class="request-date"><b>${esc(j.dateLabel)}</b><span>${esc(j.timeLabel)}</span></div><div><h3>${esc(j.service)}</h3><p>${esc(j.customer)} · ${esc(j.customerMeta)}</p><small>⌖ ${esc(j.place)}</small></div><b>${inr(j.price)}</b><button class="outline-button" data-action="open-job" data-id="${j.id}">Review</button></article>`).join('') || '<p>No requests here yet.</p>'}</div>`);
+    return header('partner', s, `<div class="tabs">${tabs.map(([k, l]) => `<button class="${reqTab === k ? 'active' : ''}" data-action="req-tab" data-v="${k}">${l} (${counts[k] || 0})</button>`).join('')}</div><div class="request-list">${list.map((j) => {
+      const isNew = j.status === 'new';
+      const isUpcoming = j.status === 'upcoming';
+      const isActive = j.status === 'active' || j.status === 'in_progress';
+      const isCompleted = j.status === 'completed';
+      const isDue = j.status === 'due';
+      let actionButtons = '';
+      if (isNew) {
+        actionButtons = `<button class="primary-button small" data-action="job-accept" data-id="${j.id}">Accept</button><button class="outline-button small" data-action="job-decline" data-id="${j.id}">Decline</button>`;
+      } else if (isUpcoming) {
+        actionButtons = `<button class="primary-button small" data-action="job-start" data-id="${j.id}">Start Service</button>`;
+      } else if (isActive) {
+        actionButtons = `<button class="primary-button small" data-action="job-complete" data-id="${j.id}">Complete</button>`;
+      } else if (isDue) {
+        actionButtons = `<button class="primary-button small" data-action="job-start" data-id="${j.id}">Start Service</button><button class="outline-button small" data-action="job-complete" data-id="${j.id}">Complete</button>`;
+      }
+      return `<article class="request-card"><div class="request-date"><b>${esc(j.dateLabel)}</b><span>${esc(j.timeLabel)}</span></div><div><h3>${esc(j.service)}</h3><p>${esc(j.customer)} · ${esc(j.customerMeta)}</p><small>⌖ ${esc(j.place)}</small></div><b>${inr(j.price)}</b><div class="request-actions">${actionButtons}<button class="outline-button small" data-action="open-job" data-id="${j.id}">Details</button></div></article>`;
+    }).join('') || '<p>No requests here yet.</p>'}</div>`);
   }
   if (s === 'job') {
     if (!jobId) return header('partner', s, empty('No job selected', 'Open a request to review it here.'));
@@ -576,6 +593,7 @@ document.addEventListener('click', async (e) => {
     if (k === 'open-job') { jobId = id; return draw('job'); }
     if (k === 'job-accept') { await api(`/partner/jobs/${id}/accept`, { method: 'POST' }); refreshCounts(); flash('Booking accepted.'); return draw('requests'); }
     if (k === 'job-decline') { await api(`/partner/jobs/${id}/decline`, { method: 'POST' }); refreshCounts(); flash('Request declined.'); return draw('requests'); }
+    if (k === 'job-start') { await api(`/partner/jobs/${id}/status`, { method: 'POST', body: { status: 'in_progress' } }); refreshCounts(); flash('Service started.'); return draw('requests'); }
     if (k === 'job-complete') { await api(`/partner/jobs/${id}/status`, { method: 'POST', body: { status: 'completed' } }); refreshCounts(); flash('Service marked as complete.'); return draw('requests'); }
     if (k === 'service-add') { await api('/partner/services', { method: 'POST', body: { name: $('#ns-name').value, price: $('#ns-price').value, durationMin: $('#ns-duration').value } }); flash('Service added.'); return draw('services', false); }
     if (k === 'service-toggle') { const cur = a.textContent.trim(); await api('/partner/services/' + id, { method: 'PATCH', body: { active: cur === 'Activate' } }); flash(cur === 'Activate' ? 'Service activated.' : 'Service paused.'); return draw('services', false); }

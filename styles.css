@@ -328,6 +328,9 @@ body.auth-mode .app-shell{display:none}
 .request-card p{margin:3px 0;font-size:11px;color:var(--muted)}
 .request-card small{font-size:10.5px;color:#8a94a7}
 .request-card>b{font:700 13px var(--display)}
+.request-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.request-actions .primary-button.small,
+.request-actions .outline-button.small{padding:6px 10px;font-size:11px}
 .job-detail-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
 .job-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
 .job-detail-grid span{font-size:9px;font-weight:800;letter-spacing:.6px;color:#98a0b2}
