@@ -178,7 +178,7 @@ async function listRecommendations() {
 
 /* ---------------- bookings ---------------- */
 
-const TAB_STATUS = { upcoming: ['pending', 'confirmed'], active: ['in_progress'], completed: ['completed'], cancelled: ['cancelled'] };
+const TAB_STATUS = { upcoming: ['pending', 'confirmed'], active: ['in_progress'], completed: ['completed'], cancelled: ['cancelled'], due: ['due'] };
 
 async function allBookings() {
   if (useDb()) {
@@ -194,6 +194,7 @@ async function enrichBooking(b) {
 }
 
 async function listBookings(userId, tab = 'upcoming') {
+  await updateOverdueBookings();
   const all = (await allBookings()).filter((b) => b.userId === userId && (TAB_STATUS[tab] || TAB_STATUS.upcoming).includes(b.status));
   const out = [];
   for (const b of all) out.push(await enrichBooking(b));
@@ -203,6 +204,30 @@ async function listBookings(userId, tab = 'upcoming') {
 async function getBooking(id, userId) {
   const b = (await allBookings()).find((x) => x.id === id && (!userId || x.userId === userId));
   return b ? enrichBooking(b) : null;
+}
+
+async function updateOverdueBookings() {
+  const all = await allBookings();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let updated = 0;
+  for (const b of all) {
+    if (['pending', 'confirmed'].includes(b.status)) {
+      const dateText = String(b.dateLabel || '').replace(/^[^,]+,\s*/, '').trim();
+      const dateParts = dateText.match(/^(\d{1,2})\s+([A-Za-z]+)$/);
+      const bookingDate = dateParts ? new Date(`${dateParts[2]} ${dateParts[1]}, ${new Date().getFullYear()}`) : new Date(dateText);
+      if (!Number.isNaN(bookingDate.getTime()) && bookingDate < today) {
+        b.status = 'due';
+        b.history = [...(b.history || []), { label: 'Marked as due (past date)', at: nowLabel() }];
+        if (useDb()) {
+          await db.pool.request().input('id', db.sql.NVarChar, b.id).input('status', db.sql.NVarChar, 'due')
+            .input('history', db.sql.NVarChar, JSON.stringify(b.history))
+            .query('UPDATE bookings SET status=@status, history=@history WHERE id=@id');
+        }
+        updated++;
+      }
+    }
+  }
+  return updated;
 }
 
 const nowLabel = () => new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit' });
@@ -429,7 +454,8 @@ async function bookingJobFor(booking) {
     booking.status === 'in_progress' ? 'active' :
     booking.status === 'completed' ? 'completed' :
     booking.status === 'declined' ? 'declined' :
-    booking.status === 'cancelled' ? 'cancelled' : 'new';
+    booking.status === 'cancelled' ? 'cancelled' :
+    booking.status === 'due' ? 'due' : 'new';
   return {
     id: booking.id,
     providerId: booking.providerId,
@@ -470,9 +496,10 @@ async function getDashboard(providerId) {
   };
 }
 
-const REQ_STATUS = { new: ['new'], upcoming: ['upcoming'], active: ['in_progress'], completed: ['completed'] };
+const REQ_STATUS = { new: ['new'], upcoming: ['upcoming'], active: ['in_progress'], completed: ['completed'], due: ['due'] };
 
 async function listRequests(providerId, tab = 'new') {
+  await updateOverdueBookings();
   const all = (await allJobs()).filter((j) => j.providerId === providerId && (REQ_STATUS[tab] || REQ_STATUS.new).includes(j.status));
   const counts = {};
   for (const [k, st] of Object.entries(REQ_STATUS)) counts[k] = (await allJobs()).filter((j) => j.providerId === providerId && st.includes(j.status)).length;
@@ -487,11 +514,11 @@ async function getJob(id, providerId) {
 }
 
 async function setJobStatus(id, providerId, status) {
-  const allowed = ['upcoming', 'declined', 'in_progress', 'completed', 'cancelled'];
+  const allowed = ['upcoming', 'declined', 'in_progress', 'completed', 'cancelled', 'due'];
   if (!allowed.includes(status)) { const e = new Error('Invalid status.'); e.code = 400; throw e; }
   const booking = (await allBookings()).find((x) => x.id === id && x.providerId === providerId);
   if (booking) {
-    const mapped = { upcoming: 'confirmed', declined: 'declined', in_progress: 'in_progress', completed: 'completed', cancelled: 'cancelled' }[status] || status;
+    const mapped = { upcoming: 'confirmed', declined: 'declined', in_progress: 'in_progress', completed: 'completed', cancelled: 'cancelled', due: 'due' }[status] || status;
     booking.status = mapped;
     if (useDb()) {
       await db.pool.request().input('id', db.sql.NVarChar, id).input('status', db.sql.NVarChar, mapped)
@@ -793,4 +820,5 @@ module.exports = {
   getOverview, listCustomers, listProviders, listBookingsAdmin, listWalletAdmin,
   listAudit, listTicketsAdmin, replyTicket, listComplaints, updateComplaint,
   getLoyaltyAdmin, listInsights, listExports, createExport, adminCounts,
+  updateOverdueBookings,
 };
