@@ -8,7 +8,11 @@ app.use(express.json({ limit: '1mb' }));
 // Allow the optional Live Server workflow on localhost:5500 to use this API.
 app.use((req, res, next) => {
   const origin = req.headers.origin || '';
-  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+$/.test(origin)) {
+  const allowedOrigins = [
+    /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+$/,
+    /^https:\/\/shop2door\.onrender\.com$/,
+  ];
+  if (allowedOrigins.some((re) => re.test(origin))) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
