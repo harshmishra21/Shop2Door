@@ -216,19 +216,28 @@ async function updateOverdueBookings() {
       const dateParts = dateText.match(/^(\d{1,2})\s+([A-Za-z]+)$/);
       let bookingDate = null;
       if (dateParts) {
-        bookingDate = new Date(`${dateParts[2]} ${dateParts[1]}, ${new Date().getFullYear()}`);
-      } else {
+        const day = parseInt(dateParts[1], 10);
+        const monthStr = dateParts[2];
+        const monthIdx = ['january','february','march','april','may','june','july','august','september','october','november','december'].findIndex(m => m.startsWith(monthStr.toLowerCase().slice(0,3)));
+        if (monthIdx >= 0) {
+          bookingDate = new Date(new Date().getFullYear(), monthIdx, day);
+        }
+      }
+      if (!bookingDate) {
         bookingDate = new Date(dateText);
       }
-      if (bookingDate && !Number.isNaN(bookingDate.getTime()) && bookingDate < today) {
-        b.status = 'due';
-        b.history = [...(b.history || []), { label: 'Marked as due (past date)', at: nowLabel() }];
-        if (useDb()) {
-          await db.pool.request().input('id', db.sql.NVarChar, b.id).input('status', db.sql.NVarChar, 'due')
-            .input('history', db.sql.NVarChar, JSON.stringify(b.history))
-            .query('UPDATE bookings SET status=@status, history=@history WHERE id=@id');
+      if (bookingDate && !Number.isNaN(bookingDate.getTime())) {
+        bookingDate.setHours(0, 0, 0, 0);
+        if (bookingDate < today) {
+          b.status = 'due';
+          b.history = [...(b.history || []), { label: 'Marked as due (past date)', at: nowLabel() }];
+          if (useDb()) {
+            await db.pool.request().input('id', db.sql.NVarChar, b.id).input('status', db.sql.NVarChar, 'due')
+              .input('history', db.sql.NVarChar, JSON.stringify(b.history))
+              .query('UPDATE bookings SET status=@status, history=@history WHERE id=@id');
+          }
+          updated++;
         }
-        updated++;
       }
     }
   }
@@ -501,7 +510,7 @@ async function getDashboard(providerId) {
   };
 }
 
-const REQ_STATUS = { new: ['new'], upcoming: ['upcoming'], active: ['in_progress'], completed: ['completed'], due: ['due'] };
+const REQ_STATUS = { new: ['new'], upcoming: ['upcoming'], active: ['active'], completed: ['completed'], due: ['due'] };
 
 async function listRequests(providerId, tab = 'new') {
   await updateOverdueBookings();
