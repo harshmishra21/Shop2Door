@@ -28,8 +28,6 @@ jobs:
         run: |
           mkdir -p www
           cp index.html app.js styles.css www/
-          # Copy any other static assets if needed
-          cp -r server/node_modules/@capacitor 2>/dev/null || true
 
       - name: Initialize Capacitor
         run: npx cap init "Shop2Door" "com.shop2door.app" --web-dir=www
@@ -40,18 +38,38 @@ jobs:
       - name: Copy web assets
         run: npx cap copy android
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          api-level: 34
-          ndk-version: r27c
-          emulator: false
+      - name: Setup Android SDK (manual)
+        run: |
+          # Install Android SDK command line tools
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y openjdk-17-jdk-headless unzip
+          
+          ANDROID_SDK_ROOT=/opt/android-sdk
+          CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+          
+          sudo mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+          cd /tmp
+          wget -q $CMDLINE_TOOLS_URL -O cmdline-tools.zip
+          sudo unzip -q cmdline-tools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
+          sudo mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
+          
+          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
+          
+          # Accept licenses and install required packages
+          yes | sudo $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
+          sudo $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" > /dev/null
+          
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
       - name: Build Debug APK
         run: cd android && ./gradlew assembleDebug --no-daemon
+        env:
+          ANDROID_SDK_ROOT: /opt/android-sdk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
