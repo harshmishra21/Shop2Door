@@ -13,5 +13,10 @@
       "keystoreAlias": null,
       "keystoreAliasPassword": null
     }
+  },
+  "plugins": {
+    "App": {
+      "launchAutoHide": true
+    }
   }
 }

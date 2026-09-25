@@ -18,8 +18,10 @@ function applyTheme(themeName = localStorage.getItem('shop2door-theme') || 'ligh
 
 /* ---------------- API client + session ---------------- */
 let session = null;
-try { session = JSON.parse(sessionStorage.getItem('s2d-session') || 'null'); } catch (e) {}
-function saveSession() { sessionStorage.setItem('s2d-session', JSON.stringify(session)); }
+const SESSION_KEY = 's2d-session';
+try { session = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) {}
+function saveSession() { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); }
+function clearSession() { localStorage.removeItem(SESSION_KEY); }
 const viewOf = (r) => (r === 'user' ? 'customer' : r);
 const isLoopbackHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
 const isCapacitor = !!(window.Capacitor || window.capacitor);
@@ -419,7 +421,7 @@ function renderAuth(mode) {
     </form>
     ${login ? '' : `<div class="auth-note"><span>✦</span><span id="auth-note-text"></span></div>`}
     <p class="auth-switch">${c.sw} <button type="button" class="text-button" data-auth="${login ? 'register' : 'login'}">${c.swLabel}</button></p>
-    <div class="auth-foot"><span>🔒 Secure by design</span><span>✓ Verified professionals</span><span>◈ Shop2Door 2026</span></div>
+    <div class="auth-foot"><span>Secure by design</span><span>✓ Verified professionals</span><span>◈ Shop2Door 2026</span></div>
   </div></div><aside class="auth-art"><div class="auth-glow"></div><div class="orb orb-one"></div><div class="orb orb-two"></div><div class="sparkle s1">✦</div><div class="sparkle s2">✦</div>
     <div class="auth-art-inner"><div class="ai-label"><span>✦</span> TRUSTED LOCAL HELP</div><h2>Local help, thoughtfully matched.</h2><p>Verified professionals, transparent pricing and real support — whether you are booking a service or growing your business.</p>
     <div class="auth-points"><div class="auth-point"><i>✓</i>Every professional is identity-verified</div><div class="auth-point"><i>◇</i>Clear prices before you book</div><div class="auth-point"><i>◌</i>Support that actually responds</div></div></div>
@@ -473,7 +475,7 @@ function signIn(s, msg) {
 }
 function signOut(silent) {
   if (session && session.token) api('/auth/logout', { method: 'POST' }).catch(() => {});
-  session = null; sessionStorage.removeItem('s2d-session');
+  session = null; clearSession();
   topupOpen = false; draft = null;
   showAuth();
   if (!silent) flash('You have been signed out');
@@ -591,12 +593,37 @@ document.addEventListener('keydown', (e) => {
 
 /* ================= boot ================= */
 const appLoader = $('#app-loader');
+const APP_VERSION = '1.0.0';
+const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/harshmishra21/Shop2Door/main/version.json';
+
 function hideLoader() {
   if (appLoader) {
     appLoader.classList.add('hidden');
     setTimeout(() => appLoader.remove(), 300);
   }
 }
+
+async function checkForUpdate() {
+  try {
+    const res = await fetch(UPDATE_CHECK_URL + '?t=' + Date.now());
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.version && data.version !== APP_VERSION && data.url) {
+      const shouldUpdate = confirm(`New version ${data.version} available. Update now?`);
+      if (shouldUpdate) {
+        if (window.Capacitor?.Plugins?.App) {
+          const { App } = Capacitor.Plugins;
+          App.openUrl({ url: data.url });
+        } else {
+          window.open(data.url, '_blank');
+        }
+      }
+    }
+  } catch (e) {
+    console.debug('Update check failed:', e.message);
+  }
+}
+
 window.addEventListener('hashchange', restore);
 (async function boot() {
   applyTheme(localStorage.getItem('shop2door-theme') || 'light');
@@ -605,8 +632,11 @@ window.addEventListener('hashchange', restore);
       const me = await api('/auth/me');
       session.user = me.user; saveSession();
       document.body.classList.remove('auth-mode'); authRoot.classList.remove('active');
-      applyAccess(); restore(); refreshCounts(); hideLoader(); return;
-    } catch (e) { session = null; sessionStorage.removeItem('s2d-session'); }
+      applyAccess(); restore(); refreshCounts(); hideLoader();
+      checkForUpdate();
+      return;
+    } catch (e) { session = null; clearSession(); }
   }
   showAuth(); hideLoader();
+  checkForUpdate();
 })();
