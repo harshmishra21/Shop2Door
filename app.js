@@ -506,6 +506,16 @@ authRoot.addEventListener('click', (e) => {
 authRoot.addEventListener('submit', (e) => { e.preventDefault(); authMode === 'login' ? handleLogin() : handleRegister(); });
 
 document.addEventListener('click', async (e) => {
+  const mobileMenu = e.target.closest('.mobile-menu');
+  if (mobileMenu) {
+    e.preventDefault();
+    document.body.classList.toggle('sidebar-open');
+    return;
+  }
+  // Close sidebar on mobile when clicking outside
+  if (document.body.classList.contains('sidebar-open') && !e.target.closest('.sidebar')) {
+    document.body.classList.remove('sidebar-open');
+  }
   const themeToggle = e.target.closest('[data-theme-toggle]');
   if (themeToggle) {
     e.preventDefault();
@@ -518,7 +528,7 @@ document.addEventListener('click', async (e) => {
   const so = e.target.closest('[data-signout]');
   if (so) { e.preventDefault(); signOut(); return; }
   const t = e.target.closest('[data-route]');
-  if (t) { e.preventDefault(); if (t.dataset.route === 'login') { signOut(); return; } if (t.dataset.route !== '#') draw(t.dataset.route); return; }
+  if (t) { e.preventDefault(); if (t.dataset.route === 'login') { signOut(); return; } if (t.dataset.route !== '#') draw(t.dataset.route); document.body.classList.remove('sidebar-open'); return; }
   const h = e.target.closest('.heart');
   if (h && !h.dataset.id) { h.textContent = h.textContent === '♡' ? '♥' : '♡'; h.style.color = h.textContent === '♥' ? '#e45f77' : ''; }
   const c = e.target.closest('.category');
@@ -580,6 +590,13 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ================= boot ================= */
+const appLoader = $('#app-loader');
+function hideLoader() {
+  if (appLoader) {
+    appLoader.classList.add('hidden');
+    setTimeout(() => appLoader.remove(), 300);
+  }
+}
 window.addEventListener('hashchange', restore);
 (async function boot() {
   applyTheme(localStorage.getItem('shop2door-theme') || 'light');
@@ -588,8 +605,8 @@ window.addEventListener('hashchange', restore);
       const me = await api('/auth/me');
       session.user = me.user; saveSession();
       document.body.classList.remove('auth-mode'); authRoot.classList.remove('active');
-      applyAccess(); restore(); refreshCounts(); return;
+      applyAccess(); restore(); refreshCounts(); hideLoader(); return;
     } catch (e) { session = null; sessionStorage.removeItem('s2d-session'); }
   }
-  showAuth();
+  showAuth(); hideLoader();
 })();

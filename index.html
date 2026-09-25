@@ -15,6 +15,13 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="auth-mode">
+    <div id="app-loader" class="app-loader">
+      <div class="loader-content">
+        <div class="loader-brand"><span class="brand-mark"><i></i><i></i><i></i></span>shop2door</div>
+        <div class="loader-spinner"></div>
+        <p class="loader-text">Loading Shop2Door...</p>
+      </div>
+    </div>
     <div id="auth-root" class="auth-root"></div>
     <div class="app-shell">
       <aside class="sidebar">
@@ -44,9 +51,6 @@
           <button class="mobile-menu" aria-label="Menu">☰</button>
           <button class="location"><span class="pin">⌖</span><span><small>YOUR LOCATION</small><strong>Andheri West, Mumbai</strong></span><i>⌄</i></button>
           <div class="top-actions">
-            <button class="icon-button mobile-logout" data-signout aria-label="Sign out">⇥</button>
-            <button class="icon-button" aria-label="Messages">◌<b></b></button>
-            <button class="icon-button" aria-label="Notifications">♧<b></b></button>
             <button class="icon-button profile-button" data-route="profile" aria-label="Open profile">◉</button>
             <button class="icon-button theme-toggle" data-theme-toggle aria-label="Toggle dark mode">☾</button>
           </div>
