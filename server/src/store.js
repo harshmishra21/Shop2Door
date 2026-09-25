@@ -208,38 +208,54 @@ async function getBooking(id, userId) {
 
 async function updateOverdueBookings() {
   const all = await allBookings();
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  // Use UTC midnight for consistent comparison regardless of server timezone
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   let updated = 0;
+
   for (const b of all) {
-    if (['pending', 'confirmed'].includes(b.status)) {
-      const dateText = String(b.dateLabel || '').replace(/^[^,]+,\s*/, '').trim();
+    if (!['pending', 'confirmed'].includes(b.status)) continue;
+
+    let bookingDateUtc = null;
+
+    // PRIMARY: Use dateValue (ISO format "YYYY-MM-DD") - unambiguous
+    if (b.dateValue && /^\d{4}-\d{2}-\d{2}$/.test(b.dateValue)) {
+      const [year, month, day] = b.dateValue.split('-').map(Number);
+      if (!Number.isNaN(year) && !Number.isNaN(month) && !Number.isNaN(day)) {
+        bookingDateUtc = Date.UTC(year, month - 1, day);
+      }
+    }
+
+    // FALLBACK: Parse dateLabel (e.g., "Saturday, 26 September")
+    if (bookingDateUtc === null && b.dateLabel) {
+      const dateText = String(b.dateLabel).replace(/^[^,]+,\s*/, '').trim();
       const dateParts = dateText.match(/^(\d{1,2})\s+([A-Za-z]+)$/);
-      let bookingDate = null;
       if (dateParts) {
         const day = parseInt(dateParts[1], 10);
-        const monthStr = dateParts[2];
-        const monthIdx = ['january','february','march','april','may','june','july','august','september','october','november','december'].findIndex(m => m.startsWith(monthStr.toLowerCase().slice(0,3)));
-        if (monthIdx >= 0) {
-          bookingDate = new Date(new Date().getFullYear(), monthIdx, day);
-        }
-      }
-      if (!bookingDate) {
-        bookingDate = new Date(dateText);
-      }
-      if (bookingDate && !Number.isNaN(bookingDate.getTime())) {
-        bookingDate.setHours(0, 0, 0, 0);
-        if (bookingDate < today) {
-          b.status = 'due';
-          b.history = [...(b.history || []), { label: 'Marked as due (past date)', at: nowLabel() }];
-          if (useDb()) {
-            await db.pool.request().input('id', db.sql.NVarChar, b.id).input('status', db.sql.NVarChar, 'due')
-              .input('history', db.sql.NVarChar, JSON.stringify(b.history))
-              .query('UPDATE bookings SET status=@status, history=@history WHERE id=@id');
-          }
-          updated++;
+        const monthStr = dateParts[2].toLowerCase();
+        const monthIdx = ['january','february','march','april','may','june','july','august','september','october','november','december']
+          .findIndex(m => m.startsWith(monthStr.slice(0, 3)));
+        if (monthIdx >= 0 && day >= 1 && day <= 31) {
+          const year = new Date().getFullYear();
+          bookingDateUtc = Date.UTC(year, monthIdx, day);
         }
       }
     }
+
+    // ONLY mark as due if we successfully parsed a date AND it's strictly before today (UTC)
+    if (bookingDateUtc !== null && !Number.isNaN(bookingDateUtc) && bookingDateUtc < todayUtc) {
+      b.status = 'due';
+      b.history = [...(b.history || []), { label: 'Marked as due (past date)', at: nowLabel() }];
+      if (useDb()) {
+        await db.pool.request()
+          .input('id', db.sql.NVarChar, b.id)
+          .input('status', db.sql.NVarChar, 'due')
+          .input('history', db.sql.NVarChar, JSON.stringify(b.history))
+          .query('UPDATE bookings SET status=@status, history=@history WHERE id=@id');
+      }
+      updated++;
+    }
+    // If parsing failed for any reason, DO NOT mark as due - leave it alone
   }
   return updated;
 }
@@ -274,7 +290,7 @@ async function createBooking(userId, { providerId, serviceId, dateValue, dateLab
   const b = {
     id: nid('b'), code: 'BK-2026-' + Math.floor(1000 + Math.random() * 9000) + '-' + Math.floor(100 + Math.random() * 900),
     userId, customerName: user.name, providerId, partnerName: provider.name, serviceId: service.id, serviceName: service.name,
-    monthLabel, dayNum, dateLabel: dateLabel || 'Saturday', timeLabel: timeLabel || provider.slots[0] || '10:00 AM',
+    monthLabel, dayNum, dateLabel: dateLabel || 'Saturday', dateValue: isoDate, timeLabel: timeLabel || provider.slots[0] || '10:00 AM',
     address: address || 'Home', comments: String(comments || '').trim().slice(0, 500), price, fee, gst, amount, status: 'pending',
     payment: payment || 'UPI', createdAt: nowLabel(),
     history: [{ label: 'Booking requested', at: nowLabel() }],
@@ -286,12 +302,13 @@ async function createBooking(userId, { providerId, serviceId, dateValue, dateLab
       .input('providerId', db.sql.NVarChar, b.providerId).input('partnerName', db.sql.NVarChar, b.partnerName)
       .input('serviceId', db.sql.NVarChar, b.serviceId).input('serviceName', db.sql.NVarChar, b.serviceName)
       .input('monthLabel', db.sql.NVarChar, b.monthLabel).input('dayNum', db.sql.NVarChar, b.dayNum)
-      .input('dateLabel', db.sql.NVarChar, b.dateLabel).input('timeLabel', db.sql.NVarChar, b.timeLabel)
-      .input('address', db.sql.NVarChar, b.address).input('comments', db.sql.NVarChar, b.comments).input('price', db.sql.Int, b.price)
+      .input('dateLabel', db.sql.NVarChar, b.dateLabel).input('dateValue', db.sql.NVarChar, b.dateValue)
+      .input('timeLabel', db.sql.NVarChar, b.timeLabel).input('address', db.sql.NVarChar, b.address)
+      .input('comments', db.sql.NVarChar, b.comments).input('price', db.sql.Int, b.price)
       .input('fee', db.sql.Int, b.fee).input('gst', db.sql.Int, b.gst).input('amount', db.sql.Int, b.amount)
       .input('status', db.sql.NVarChar, b.status).input('payment', db.sql.NVarChar, b.payment)
       .input('createdAt', db.sql.NVarChar, b.createdAt).input('history', db.sql.NVarChar, J(b.history))
-      .query('INSERT INTO bookings (id,code,userId,customerName,providerId,partnerName,serviceId,serviceName,monthLabel,dayNum,dateLabel,timeLabel,address,comments,price,fee,gst,amount,status,payment,createdAt,history) VALUES (@id,@code,@userId,@customerName,@providerId,@partnerName,@serviceId,@serviceName,@monthLabel,@dayNum,@dateLabel,@timeLabel,@address,@comments,@price,@fee,@gst,@amount,@status,@payment,@createdAt,@history)');
+      .query('INSERT INTO bookings (id,code,userId,customerName,providerId,partnerName,serviceId,serviceName,monthLabel,dayNum,dateLabel,dateValue,timeLabel,address,comments,price,fee,gst,amount,status,payment,createdAt,history) VALUES (@id,@code,@userId,@customerName,@providerId,@partnerName,@serviceId,@serviceName,@monthLabel,@dayNum,@dateLabel,@dateValue,@timeLabel,@address,@comments,@price,@fee,@gst,@amount,@status,@payment,@createdAt,@history)');
   } else {
     mem.bookings.push(b);
   }
