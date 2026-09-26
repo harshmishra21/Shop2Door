@@ -49,9 +49,17 @@ const availability = Object.fromEntries(providers.map((provider) => [provider.id
   schedule: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => ({ day, open: index < 6, from: '9:00 AM', to: '7:00 PM' })),
 }]));
 
+const complaints = [
+  { id: 'CMP-001', customer: 'Armaan Mulani', title: 'Refund not processed for cancelled booking', channel: 'app', priority: 'HIGH', status: 'New', age: '2h', createdAt: '2026-09-25' },
+  { id: 'CMP-002', customer: 'Priya Sharma', title: 'Service provider arrived 2 hours late', channel: 'app', priority: 'MEDIUM', status: 'Investigating', age: '1d', createdAt: '2026-09-24' },
+  { id: 'CMP-003', customer: 'Rahul Verma', title: 'Quality of cleaning service was poor', channel: 'app', priority: 'MEDIUM', status: 'Resolution proposed', age: '3d', createdAt: '2026-09-22' },
+  { id: 'CMP-004', customer: 'Social User @twitter', title: 'Booking system showing wrong prices', channel: 'social', priority: 'HIGH', status: 'New', age: '5h', createdAt: '2026-09-25' },
+  { id: 'CMP-005', customer: 'Anita Desai', title: 'Provider cancelled last minute without notice', channel: 'app', priority: 'HIGH', status: 'Resolved', age: '1w', createdAt: '2026-09-18' },
+];
+
 module.exports = {
   accounts, users, categories, providers, services, availability,
-  reviews: [], bookings: [], walletTxns: [], loyaltyActivity: [], recommendations: [], tickets: [], complaints: [], jobs: [], earnings: {},
+  reviews: [], bookings: [], walletTxns: [], loyaltyActivity: [], recommendations: [], tickets: [], complaints, jobs: [], earnings: {},
   overview: { metrics: [], series: [], seriesLabels: [], aiInsight: {}, topCategory: {} }, loyaltyAdmin: { totals: [], tiers: [], campaign: {} },
   insights: [], exportsLog: [], auditLog: [],
 };

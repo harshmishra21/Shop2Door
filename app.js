@@ -113,14 +113,15 @@ function bookingCalendarParts(booking) {
   return { day: match ? match[1] : String(booking.dayNum || '').replace(/\D/g, ''), month: match ? match[2].slice(0, 3).toUpperCase() : String(booking.monthLabel || '').slice(0, 3).toUpperCase() };
 }
 function svgChart(vals, labels) {
-  const W = 620, H = 210, pad = 8, max = Math.max(...vals, 1);
+  const W = 620, H = 210, pad = 8, max = 20;
   const pts = vals.map((v, i) => [pad + (i * (W - pad * 2)) / (vals.length - 1), H - pad - (v / max) * (H - pad * 2)]);
   const line = pts.map((p, i) => {
     if (i === 0) return `M${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
     const [x0, y0] = pts[i - 1], dx = (p[0] - x0) / 2;
     return `C${(x0 + dx).toFixed(1)} ${y0.toFixed(1)},${(p[0] - dx).toFixed(1)} ${p[1].toFixed(1)},${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
   }).join(' ');
-  return `<div class="fake-chart"><div class="chart-y"><span>2k</span><span>1.5k</span><span>1k</span><span>500</span><span>0</span></div><svg viewBox="0 0 620 210" preserveAspectRatio="none" aria-label="Booking trend chart"><defs><linearGradient id="fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#375dfb" stop-opacity=".22"/><stop offset="100%" stop-color="#375dfb" stop-opacity="0"/></linearGradient></defs><path class="chart-fill" d="${line} V210 H0Z"/><path class="chart-line" d="${line}"/></svg><div class="chart-x">${labels.map((l) => `<span>${l}</span>`).join('')}</div></div>`;
+  const yLabels = [20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0];
+  return `<div class="fake-chart"><div class="chart-y">${yLabels.map(v => `<span>${v}</span>`).join('')}</div><svg viewBox="0 0 620 210" preserveAspectRatio="none" aria-label="Booking trend chart"><defs><linearGradient id="fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#375dfb" stop-opacity=".22"/><stop offset="100%" stop-color="#375dfb" stop-opacity="0"/></linearGradient></defs><path class="chart-fill" d="${line} V210 H0Z"/><path class="chart-line" d="${line}"/></svg><div class="chart-x">${labels.map((l) => `<span>${l}</span>`).join('')}</div></div>`;
 }
 const photoFor = (p, i) => {
   const map = { 'provider-1': 'photo-rahul', 'provider-2': 'photo-cool', 'provider-3': 'photo-neha', 'provider-4': 'photo-arya', 'provider-5': 'photo-kabir', 'provider-6': 'photo-meera' };
