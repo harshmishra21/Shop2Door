@@ -57,9 +57,22 @@ const complaints = [
   { id: 'CMP-005', customer: 'Anita Desai', title: 'Provider cancelled last minute without notice', channel: 'app', priority: 'HIGH', status: 'Resolved', age: '1w', createdAt: '2026-09-18' },
 ];
 
+const overview = {
+  metrics: [
+    { label: 'Total Bookings', value: '1,234', trend: '+12%', tone: 'positive', sub: 'vs last week' },
+    { label: 'Active Providers', value: '89', trend: '+3%', tone: 'positive', sub: 'vs last month' },
+    { label: 'Revenue', value: '₹12.4L', trend: '+8%', tone: 'positive', sub: 'vs last week' },
+    { label: 'Avg Rating', value: '4.7', trend: '+0.2', tone: 'positive', sub: 'customer satisfaction' },
+  ],
+  series: [12, 19, 8, 15, 11, 18, 14, 16, 9, 17, 13, 15, 10, 12, 8],
+  seriesLabels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon'],
+  aiInsight: { title: 'Peak demand on weekends', text: 'Booking volume increases 40% on weekends. Consider adding more provider slots.', confidence: 87 },
+  topCategory: { name: 'Electrician', revenue: '₹4.2L', note: 'Highest revenue category', bar: 78, bookings: 342, rating: 4.8 },
+};
+
 module.exports = {
   accounts, users, categories, providers, services, availability,
   reviews: [], bookings: [], walletTxns: [], loyaltyActivity: [], recommendations: [], tickets: [], complaints, jobs: [], earnings: {},
-  overview: { metrics: [], series: [], seriesLabels: [], aiInsight: {}, topCategory: {} }, loyaltyAdmin: { totals: [], tiers: [], campaign: {} },
+  overview, loyaltyAdmin: { totals: [], tiers: [], campaign: {} },
   insights: [], exportsLog: [], auditLog: [],
 };
