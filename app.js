@@ -618,6 +618,37 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.id === 'service-search' && !document.body.classList.contains('auth-mode')) { lastQuery = e.target.value.trim(); draw('results'); }
 });
 
+// Capacitor/Android back button handler
+document.addEventListener('backbutton', (e) => {
+  e.preventDefault();
+  if (document.body.classList.contains('auth-mode')) {
+    // On auth screen, exit app
+    if (window.Capacitor?.Plugins?.App) {
+      const { App } = Capacitor.Plugins;
+      App.exitApp();
+    }
+    return;
+  }
+  if (document.body.classList.contains('sidebar-open')) {
+    document.body.classList.remove('sidebar-open');
+    return;
+  }
+  // Navigate back in history or go to dashboard
+  if (screen !== 'home' && screen !== 'dashboard' && role === 'customer') {
+    draw('home');
+    return;
+  }
+  if (screen !== 'dashboard' && (role === 'partner' || role === 'admin')) {
+    draw('dashboard');
+    return;
+  }
+  // On main screens, exit app
+  if (window.Capacitor?.Plugins?.App) {
+    const { App } = Capacitor.Plugins;
+    App.exitApp();
+  }
+});
+
 /* ================= boot ================= */
 const appLoader = $('#app-loader');
 const APP_VERSION = '1.0.0';
