@@ -58,8 +58,8 @@ router.post('/tickets', me, asyncH(async (req, res) => res.status(201).json(awai
 router.get('/counts', me, asyncH(async (req, res) => res.json(await store.customerCounts(req.auth.userId))));
 
 router.patch('/profile', me, asyncH(async (req, res) => {
-  const { name, mobile, address, pinCode, useCurrentLocation } = req.body || {};
-  const updated = await store.updateUserProfile(req.auth.userId, { name, mobile, address, pinCode, useCurrentLocation });
+  const { name, mobile, address, pinCode, useCurrentLocation, latitude, longitude } = req.body || {};
+  const updated = await store.updateUserProfile(req.auth.userId, { name, mobile, address, pinCode, useCurrentLocation, latitude, longitude });
   res.json({ user: store.publicUser(updated) });
 }));
 

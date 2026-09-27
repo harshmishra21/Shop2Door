@@ -16,9 +16,9 @@ const password = (value) => {
   return { passwordHash: hashPassword(value, salt), salt };
 };
 const users = [
-  { id: 'admin-1', name: 'Shop2Door Admin', email: accounts.admin.email, mobile: '+91 90000 00000', role: 'admin', ...password(accounts.admin.password), memberSince: 'September 2026', walletBalance: 0, walletPromo: 0, walletRefund: 0, walletSaved: 0, loyaltyTier: 'Bronze', loyaltyPoints: 0, providerId: null },
-  { id: 'user-1', name: 'Armaan Mulani', email: accounts.user.email, mobile: '+91 98765 43210', role: 'user', ...password(accounts.user.password), memberSince: 'September 2026', walletBalance: 0, walletPromo: 0, walletRefund: 0, walletSaved: 0, loyaltyTier: 'Bronze', loyaltyPoints: 0, providerId: null },
-  ...accounts.partners.map((account, index) => ({ id: `partner-${index + 1}`, name: account.name, email: account.email, mobile: '', role: 'partner', ...password(account.password), memberSince: 'September 2026', walletBalance: 0, walletPromo: 0, walletRefund: 0, walletSaved: 0, loyaltyTier: 'Bronze', loyaltyPoints: 0, providerId: `provider-${index + 1}` })),
+  { id: 'admin-1', name: 'Shop2Door Admin', email: accounts.admin.email, mobile: '+91 90000 00000', role: 'admin', ...password(accounts.admin.password), memberSince: 'September 2026', walletBalance: 0, walletPromo: 0, walletRefund: 0, walletSaved: 0, loyaltyTier: 'Bronze', loyaltyPoints: 0, providerId: null, useCurrentLocation: false, latitude: null, longitude: null },
+  { id: 'user-1', name: 'Armaan Mulani', email: accounts.user.email, mobile: '+91 98765 43210', role: 'user', ...password(accounts.user.password), memberSince: 'September 2026', walletBalance: 0, walletPromo: 0, walletRefund: 0, walletSaved: 0, loyaltyTier: 'Bronze', loyaltyPoints: 0, providerId: null, useCurrentLocation: false, latitude: null, longitude: null },
+  ...accounts.partners.map((account, index) => ({ id: `partner-${index + 1}`, name: account.name, email: account.email, mobile: '', role: 'partner', ...password(account.password), memberSince: 'September 2026', walletBalance: 0, walletPromo: 0, walletRefund: 0, walletSaved: 0, loyaltyTier: 'Bronze', loyaltyPoints: 0, providerId: `provider-${index + 1}`, useCurrentLocation: false, latitude: null, longitude: null })),
 ];
 
 const categories = [

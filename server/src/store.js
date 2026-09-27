@@ -669,13 +669,15 @@ async function updateProfile(providerId, patch) {
 
 async function updateUserProfile(userId, patch) {
   if (useDb()) {
-    const allowed = ['name', 'mobile', 'address', 'pinCode', 'useCurrentLocation'];
+    const allowed = ['name', 'mobile', 'address', 'pinCode', 'useCurrentLocation', 'latitude', 'longitude'];
     const sets = [], inputs = [];
     for (const key of allowed) {
       if (patch[key] !== undefined) {
         sets.push(`${key}=@${key}`);
         const val = patch[key];
-        const type = key === 'useCurrentLocation' ? db.sql.Bit : db.sql.NVarChar;
+        let type = db.sql.NVarChar;
+        if (key === 'useCurrentLocation') type = db.sql.Bit;
+        else if (key === 'latitude' || key === 'longitude') type = db.sql.Float;
         inputs.push({ key, type, val: key === 'useCurrentLocation' ? (val ? 1 : 0) : val });
       }
     }
@@ -687,7 +689,7 @@ async function updateUserProfile(userId, patch) {
   }
   const u = mem.users.find((x) => x.id === userId);
   if (!u) { const e = new Error('User not found.'); e.code = 404; throw e; }
-  const allowed = ['name', 'mobile', 'address', 'pinCode', 'useCurrentLocation'];
+  const allowed = ['name', 'mobile', 'address', 'pinCode', 'useCurrentLocation', 'latitude', 'longitude'];
   for (const key of allowed) if (patch[key] !== undefined) u[key] = patch[key];
   return u;
 }

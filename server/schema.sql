@@ -18,7 +18,9 @@ CREATE TABLE users (
   loyaltyTier NVARCHAR(20) NOT NULL DEFAULT 'Bronze',
   loyaltyPoints INT NOT NULL DEFAULT 0,
   providerId NVARCHAR(32) NULL,
-  useCurrentLocation BIT NOT NULL DEFAULT 0
+  useCurrentLocation BIT NOT NULL DEFAULT 0,
+  latitude FLOAT NULL,
+  longitude FLOAT NULL
 );
 
 CREATE TABLE categories (

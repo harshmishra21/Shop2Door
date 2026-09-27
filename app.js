@@ -76,7 +76,7 @@ const navs = {
   admin: [['dashboard', '◈', 'Overview'], ['customers', '♙', 'Customers'], ['providers', '♜', 'Providers'], ['bookings', '▣', 'Bookings'], ['queries', '◌', 'Queries'], ['complaints', '⚑', 'Complaints'], ['social', '◎', 'Social complaints'], ['loyalty', '✦', 'Loyalty'], ['wallet', '◇', 'Wallet'], ['insights', '✦', 'AI insights'], ['reports', '↧', 'Reports & exports'], ['audit', '◷', 'Audit logs']]
 };
 const names = {
-  customer: { search: ['Find a service', 'Search by service, task, or natural language.'], results: ['Electricians near Andheri West', '14 verified professionals available today.'], provider: ['Provider profile', 'Verified professional serving Andheri West.'], booking: ['Book your service', 'Choose the details for your visit.'], confirmation: ['Booking confirmed', 'Your appointment is safely booked.'], tracking: ['Track booking', 'Live status of your appointment.'], bookings: ['My bookings', 'Keep track of every appointment.'], wallet: ['Shop2Door wallet', 'Credits, refunds and payments in one place.'], loyalty: ['Your rewards', 'More bookings, better benefits.'], reviews: ['Rate your experience', 'Your feedback helps the community choose with confidence.'], support: ['Help & support', 'Find an answer or start a support request.'], complaint: ['Tell us what happened', 'We will route your request to the right specialist.'], profile: ['Your profile', 'Manage your account, addresses and preferences.'], recommendations: ['For you', 'Personalized suggestions based on your permitted activity.'] },
+  customer: { search: ['Find a service', 'Search by service, task, or natural language.'], results: ['Services available near you.', 'Verified professionals available today.'], provider: ['Provider profile', 'Verified professional serving your area.'], booking: ['Book your service', 'Choose the details for your visit.'], confirmation: ['Booking confirmed', 'Your appointment is safely booked.'], tracking: ['Track booking', 'Live status of your appointment.'], bookings: ['My bookings', 'Keep track of every appointment.'], wallet: ['Shop2Door wallet', 'Credits, refunds and payments in one place.'], loyalty: ['Your rewards', 'More bookings, better benefits.'], reviews: ['Rate your experience', 'Your feedback helps the community choose with confidence.'], support: ['Help & support', 'Find an answer or start a support request.'], complaint: ['Tell us what happened', 'We will route your request to the right specialist.'], profile: ['Your profile', 'Manage your account, addresses and preferences.'], recommendations: ['For you', 'Personalized suggestions based on your permitted activity.'] },
   partner: { services: ['Your services', 'Manage what customers can book.'], availability: ['Availability', 'Choose when you accept new work.'], requests: ['Booking requests', 'Respond quickly to keep your ranking strong.'], job: ['Job details', 'Review the request before responding.'], earnings: ['Earnings', 'Your completed work and payouts.'], profile: ['Business profile', 'The information customers see before booking.'], kyc: ['Verification', 'Complete verification to receive more bookings.'] },
   admin: { customers: ['Customers', 'Customer records'], providers: ['Providers', 'Providers across cities'], bookings: ['Bookings', 'Marketplace activity'], queries: ['Support inbox', 'Tickets needing attention'], complaints: ['Complaint management', 'Review, assign and resolve customer issues'], social: ['Social complaints', 'Official-channel mentions requiring attention'], loyalty: ['Loyalty management', 'Tiers, rewards and points activity'], wallet: ['Wallet ledger', 'Customer balance and transaction controls'], insights: ['AI insights', 'Intelligence from marketplace activity'], reports: ['Reports & exports', 'Generate permission-safe data exports'], audit: ['Audit logs', 'Recent platform and administrative activity'] }
 };
@@ -150,7 +150,7 @@ async function customerHome() {
   const next = upcoming[0];
   const nextCalendar = next ? bookingCalendarParts(next) : null;
   return `
-  <div class="welcome-row"><div><p class="eyebrow">${todayLabel()}</p><h1>${greeting()}, ${esc(firstName())} <span>✦</span></h1><p class="subhead">What can we make easier today?</p></div><button class="voice-search">⌁ <span>Try voice search</span></button></div>
+  <div class="welcome-row"><div><p class="eyebrow">${todayLabel()}</p><h1>${greeting()}, ${esc(firstName())} <span>✦</span></h1><p class="subhead">What can we make easier today?</p></div></div>
   <div class="search-wrap"><span>⌕</span><input id="service-search" placeholder="What service do you need?" value="${esc(lastQuery)}"/><kbd>⌘ K</kbd></div>
   <div class="quick-searches"><span>TRY:</span><button data-action="quick" data-q="AC repair near me">AC repair near me</button><button data-action="quick" data-q="Math tutor">Math tutor</button><button data-action="quick" data-q="Home cleaning">Home cleaning</button></div>
   <section class="section categories-section"><div class="section-heading"><div><p class="eyebrow">EXPLORE SERVICES</p><h2>What do you need help with?</h2></div><button class="text-button" data-route="search">View all <span>→</span></button></div>
@@ -618,12 +618,39 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (k === 'location-toggle') {
-    const checked = document.getElementById('use-current-location')?.checked;
-    try {
-      await api('/profile', { method: 'PATCH', body: { useCurrentLocation: checked } });
-      session.user = { ...session.user, useCurrentLocation: checked }; saveSession();
-      flash(checked ? 'Current location enabled' : 'Current location disabled');
-    } catch (e) { flash(e.message); }
+    const checkbox = document.getElementById('use-current-location');
+    const checked = checkbox?.checked;
+    if (checked) {
+      if (!navigator.geolocation) {
+        flash('Geolocation is not supported by your browser');
+        checkbox.checked = false;
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          try {
+            await api('/profile', { method: 'PATCH', body: { useCurrentLocation: true, latitude, longitude } });
+            session.user = { ...session.user, useCurrentLocation: true, latitude, longitude }; saveSession();
+            flash('Current location enabled');
+          } catch (e) {
+            checkbox.checked = false;
+            flash(e.message);
+          }
+        },
+        (err) => {
+          checkbox.checked = false;
+          flash(err.code === 1 ? 'Location permission denied' : 'Unable to get location');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      try {
+        await api('/profile', { method: 'PATCH', body: { useCurrentLocation: false } });
+        session.user = { ...session.user, useCurrentLocation: false }; saveSession();
+        flash('Current location disabled');
+      } catch (e) { flash(e.message); }
+    }
     return;
   }
   if (k === 'req-tab') { reqTab = v; return draw('requests', false); }
