@@ -185,7 +185,7 @@ async function customer(s) {
   if (s === 'provider') {
     const p = await api('/providers/' + providerId);
     const active = (p.services || []).filter((x) => x.active);
-    return header('customer', s, `<div class="provider-profile"><div class="profile-cover"></div><section class="provider-hero"><div class="provider-avatar">${esc(p.initials)}</div><div class="provider-identity"><h2>${esc(p.name)} ${p.verified ? badge('✓ Verified', 'verified') : ''}</h2><p>${esc(p.category)} · ${esc(p.area)} · ${esc(p.exp)}</p><div class="profile-stats"><span><b>${p.rating} ★</b> ${p.reviewsCount} reviews</span><span><b>${p.responseMin} min</b> response time</span></div></div><button class="outline-button" data-action="save-toggle">♡ Save</button></section><div class="profile-tabs"><button class="active">Overview</button><button>Services</button><button>Reviews</button><button>Portfolio</button></div><div class="profile-main"><div>${card('About ' + esc(p.name.split(' ')[0]), `<p>${esc(p.about)}</p><div class="trust-list">${(p.trust || []).map((t) => `<span>✓ ${esc(t)}</span>`).join('')}</div>`)}${card('Services', active.map((x) => `<div class="service-option"><div><h4>${esc(x.name)}</h4><p>${esc(x.detail)}</p></div><b>${inr(x.price)}</b></div>`).join('') || '<p>No services listed right now.</p>')}${card(`Reviews (${p.reviewsCount})`, (p.reviews || []).map((r) => `<div class="service-option"><div><h4>${esc(r.author)} · ${'★'.repeat(r.rating)}</h4><p>${esc(r.text)}</p></div><b>${esc(r.at)}</b></div>`).join('') || '<p>No reviews yet.</p>')}</div><aside>${card('Next available', `<p><b>${esc((p.slots || [])[0] || 'Contact for slots')}</b></p><p>Service visits start from ${inr(p.priceFrom)}${p.priceUnit || ''}</p><button class="primary-button" data-action="book-provider" data-id="${p.id}">Book ${esc(p.name.split(' ')[0])}</button><small>✓ Free cancellation up to 2 hours before</small>`)}${card('Service area', `<p>${esc(p.area)}</p>`)}</aside></div></div>`, `<button class="primary-button" data-action="book-provider" data-id="${p.id}">Book this provider <span>→</span></button>`);
+    return header('customer', s, `<div class="provider-profile"><div class="profile-cover"></div><section class="provider-hero"><div class="provider-avatar">${esc(p.initials)}</div><div class="provider-identity"><h2>${esc(p.name)} ${p.verified ? badge('✓ Verified', 'verified') : ''}</h2><p>${esc(p.category)} · ${esc(p.area)} · ${esc(p.exp)}</p><div class="profile-stats"><span><b>${p.rating} ★</b> ${p.reviewsCount} reviews</span><span><b>${p.responseMin} min</b> response time</span></div></div><button class="outline-button" data-action="save-toggle">♡ Save</button></section><div class="profile-tabs"><button class="active">Overview</button><button>Services</button><button>Reviews</button><button>Portfolio</button></div><div class="profile-main"><div>${card('About ' + esc(p.name.split(' ')[0]), `<p>${esc(p.about)}</p><div class="trust-list">${(p.trust || []).map((t) => `<span>✓ ${esc(t)}</span>`).join('')}</div>`)}${card('Services', active.map((x) => `<div class="service-option" data-action="book-service" data-provider-id="${p.id}" data-service-id="${x.id}"><div><h4>${esc(x.name)}</h4><p>${esc(x.detail)}</p></div><b>${inr(x.price)}</b></div>`).join('') || '<p>No services listed right now.</p>')}${card(`Reviews (${p.reviewsCount})`, (p.reviews || []).map((r) => `<div class="service-option"><div><h4>${esc(r.author)} · ${'★'.repeat(r.rating)}</h4><p>${esc(r.text)}</p></div><b>${esc(r.at)}</b></div>`).join('') || '<p>No reviews yet.</p>')}</div><aside>${card('Next available', `<p><b>${esc((p.slots || [])[0] || 'Contact for slots')}</b></p><p>Service visits start from ${inr(p.priceFrom)}${p.priceUnit || ''}</p><button class="primary-button" data-action="book-provider" data-id="${p.id}">Book ${esc(p.name.split(' ')[0])}</button><small>✓ Free cancellation up to 2 hours before</small>`)}${card('Service area', `<p>${esc(p.area)}</p>`)}</aside></div></div>`, `<button class="primary-button" data-action="book-provider" data-id="${p.id}">Book this provider <span>→</span></button>`);
   }
   if (s === 'booking') {
     if (!draft) return header('customer', s, empty('Choose a professional first', 'Pick a provider to start a booking.'));
@@ -241,7 +241,7 @@ async function customer(s) {
   if (s === 'complaint') return header('customer', s, `<article class="form-card"><div class="form-grid"><label class="form-field"><span>RELATED BOOKING</span><input id="cp-booking" placeholder="e.g. BK-2026-0912-884"/></label><label class="form-field"><span>ISSUE CATEGORY</span><input id="cp-category" value="Payment or refund"/></label><label class="form-field"><span>PREFERRED RESOLUTION</span><input id="cp-resolution" value="Refund to Shop2Door wallet"/></label></div><label class="form-field"><span>DESCRIBE THE ISSUE</span><textarea id="cp-desc" placeholder="Include the important details so we can help quickly."></textarea></label><button class="primary-button" data-action="ticket-submit">Submit request <span>→</span></button></article>`);
   if (s === 'profile') {
     const u = session.user, parts = u.name.split(' ');
-    return header('customer', s, `<div class="profile-settings"><aside class="settings-nav"><button class="active">Personal information</button><button>Addresses</button><button>Payment methods</button><button data-route="wallet">Wallet</button><button data-route="loyalty">Loyalty</button><button>Notifications</button><button>Privacy & security</button></aside><div>${card('', `<div class="profile-person"><span class="avatar big">${esc(initials(u.name))}</span><div><h3>${esc(u.name)}</h3><p>Member since ${esc(u.memberSince || '')}</p></div><button class="outline-button" data-action="noop">Change photo</button></div><div class="form-grid">${field('FIRST NAME', parts[0] || '')}${field('LAST NAME', parts.slice(1).join(' ') || '')}${field('EMAIL', u.email)}${field('PHONE', u.mobile || '')}</div><button class="primary-button" data-action="profile-save">Save changes</button>`) + card('Saved addresses', '<h3>Home</h3><p>14B, Shantivan Apartments, Lokhandwala Complex, Andheri West, Mumbai 400053</p><button class="text-button">Manage addresses →</button>')}</div></div>`, btn('Sign out', 'login', 'outline-button'));
+    return header('customer', s, `<div class="profile-form-page">${card('Personal Information', `<div class="profile-person"><span class="avatar big">${esc(initials(u.name))}</span><div><h3>${esc(u.name)}</h3><p>Member since ${esc(u.memberSince || '')}</p></div><button class="outline-button" data-action="noop">Change photo</button></div><div class="form-grid">${field('FIRST NAME', parts[0] || '')}${field('LAST NAME', parts.slice(1).join(' ') || '')}${field('EMAIL', u.email)}${field('PHONE', u.mobile || '')}</div><div class="form-grid">${field('ADDRESS', u.address || '')}${field('PIN CODE', u.pinCode || '')}</div><button class="primary-button" data-action="profile-save">Save changes</button>`)}${card('Location Settings', `<div class="location-toggle"><label class="checkbox-label"><input type="checkbox" id="use-current-location" ${u.useCurrentLocation ? 'checked' : ''} data-action="location-toggle"/><span>Use current location</span></label></div><p class="location-note">When enabled, we'll use your device location for booking convenience. This does <strong>not</strong> filter or restrict available services.</p>`)}${card('Saved Addresses', '<h3>Home</h3><p>14B, Shantivan Apartments, Lokhandwala Complex, Andheri West, Mumbai 400053</p><button class="text-button">Manage addresses →</button>')}</div>`, btn('Sign out', 'login', 'outline-button'));
   }
   if (s === 'recommendations') {
     const recs = await api('/recommendations');
@@ -481,9 +481,14 @@ async function handleLogin() {
 }
 async function handleRegister() {
   const partner = authTab === 'partner';
+  const email = $('#auth-email').value.trim();
+  const mobile = $('#auth-mobile').value.trim();
+  const password = $('#auth-pass').value;
+  if (!/^\S+@\S+\.\S+$/.test(email)) return authFail('Invalid email', 'Enter a valid email address.');
+  if (mobile.replace(/\D/g, '').length < 10) return authFail('Invalid mobile', 'Enter a valid 10-digit mobile number.');
+  if (password.length < 6) return authFail('Weak password', 'Password must be at least 6 characters.');
   const payload = {
-    name: $('#auth-name').value.trim(), email: $('#auth-email').value.trim(),
-    mobile: $('#auth-mobile').value.trim(), password: $('#auth-pass').value,
+    name: $('#auth-name').value.trim(), email, mobile, password,
     role: partner ? 'partner' : 'user', businessName: partner && $('#auth-business') ? $('#auth-business').value.trim() : '',
   };
   if (partner && !payload.businessName) return authFail('Business name required', 'Tell customers what your business is called.');
@@ -572,6 +577,7 @@ document.addEventListener('click', async (e) => {
     if (k === 'open-category') { lastQuery = a.dataset.q || ''; $$('.category').forEach((x) => x.classList.toggle('selected', x === a)); filters = { availableToday: false, verified: false, topRated: false, under500: false, maxDistance: 0 }; return draw('results'); }
     if (k === 'open-provider') { providerId = id; return draw('provider'); }
     if (k === 'book-provider') { const p = await api('/providers/' + id); const days = nextDays(); draft = { providerId: id, serviceId: (p.services.find((x) => x.active) || p.services[0] || {}).id, dateIdx: 1, dateValue: days[1].iso, dateLabel: days[1].full, dayNum: days[1].num, time: (p.slots || [])[0] || '10:30 AM', address: 'Home · 14B, Shantivan, Andheri West', payment: 'UPI' }; return draw('booking'); }
+  if (k === 'book-service') { const providerId = a.dataset.providerId; const serviceId = a.dataset.serviceId; const p = await api('/providers/' + providerId); const days = nextDays(); draft = { providerId, serviceId, dateIdx: 1, dateValue: days[1].iso, dateLabel: days[1].full, dayNum: days[1].num, time: (p.slots || [])[0] || '10:30 AM', address: 'Home · 14B, Shantivan, Andheri West', payment: 'UPI' }; return draw('booking'); }
     if (k === 'pick-service') { draft.serviceId = id; return draw('booking', false); }
     if (k === 'pick-date') { const days = nextDays(); draft.dateIdx = Number(a.dataset.i); draft.dateValue = days[draft.dateIdx].iso; draft.dateLabel = days[draft.dateIdx].full; draft.dayNum = days[draft.dateIdx].num; return draw('booking', false); }
     if (k === 'pick-time') { draft.time = v; return draw('booking', false); }
@@ -589,8 +595,38 @@ document.addEventListener('click', async (e) => {
     if (k === 'tag') { const rtx = $('#review-text'); if (rtx) reviewDraft.text = rtx.value; const i = reviewDraft.tags.indexOf(v); i >= 0 ? reviewDraft.tags.splice(i, 1) : reviewDraft.tags.push(v); return draw('reviews', false); }
     if (k === 'review-submit') { await api('/reviews', { method: 'POST', body: { bookingId: reviewDraft.bookingId, rating: reviewDraft.rating, tags: reviewDraft.tags, text: $('#review-text').value } }); reviewDraft = { rating: 5, tags: [] }; flash('Thanks — your review was posted. +25 points.'); return draw('bookings'); }
     if (k === 'ticket-submit') { await api('/tickets', { method: 'POST', body: { bookingRef: $('#cp-booking').value, category: $('#cp-category').value, resolution: $('#cp-resolution').value, description: $('#cp-desc').value } }); flash('Support request submitted — we will respond shortly.'); return draw('support'); }
-    if (k === 'profile-save') return flash('Profile saved.');
-    if (k === 'req-tab') { reqTab = v; return draw('requests', false); }
+    if (k === 'profile-save') {
+    const firstName = $('#bk-address') ? '' : ($('#pf-biz') ? '' : (document.querySelector('input[value="' + (session.user.name.split(' ')[0] || '') + '"]')?.value || ''));
+    // Get values from the form
+    const inputs = document.querySelectorAll('#customer-view .profile-form-page input');
+    const data = {};
+    inputs.forEach(inp => {
+      const label = inp.previousElementSibling?.textContent?.toUpperCase() || '';
+      if (label.includes('FIRST') || label.includes('LAST')) data.name = data.name ? data.name + ' ' + inp.value : inp.value;
+      else if (label.includes('EMAIL')) data.email = inp.value;
+      else if (label.includes('PHONE')) data.mobile = inp.value;
+      else if (label.includes('ADDRESS')) data.address = inp.value;
+      else if (label.includes('PIN')) data.pinCode = inp.value;
+    });
+    const useLoc = document.getElementById('use-current-location')?.checked;
+    if (useLoc !== undefined) data.useCurrentLocation = useLoc;
+    try {
+      const res = await api('/profile', { method: 'PATCH', body: data });
+      session.user = res.user; saveSession();
+      applyAccess(); flash('Profile saved successfully');
+    } catch (e) { flash(e.message); }
+    return;
+  }
+  if (k === 'location-toggle') {
+    const checked = document.getElementById('use-current-location')?.checked;
+    try {
+      await api('/profile', { method: 'PATCH', body: { useCurrentLocation: checked } });
+      session.user = { ...session.user, useCurrentLocation: checked }; saveSession();
+      flash(checked ? 'Current location enabled' : 'Current location disabled');
+    } catch (e) { flash(e.message); }
+    return;
+  }
+  if (k === 'req-tab') { reqTab = v; return draw('requests', false); }
     if (k === 'open-job') { jobId = id; return draw('job'); }
     if (k === 'job-accept') { await api(`/partner/jobs/${id}/accept`, { method: 'POST' }); refreshCounts(); flash('Booking accepted.'); return draw('requests'); }
     if (k === 'job-decline') { await api(`/partner/jobs/${id}/decline`, { method: 'POST' }); refreshCounts(); flash('Request declined.'); return draw('requests'); }

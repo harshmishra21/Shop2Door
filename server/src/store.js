@@ -667,6 +667,29 @@ async function updateProfile(providerId, patch) {
   return p;
 }
 
+async function updateUserProfile(userId, patch) {
+  if (useDb()) {
+    const allowed = ['name', 'mobile', 'address', 'pinCode', 'useCurrentLocation'];
+    const sets = [], inputs = [];
+    for (const key of allowed) {
+      if (patch[key] !== undefined) {
+        sets.push(`${key}=@${key}`);
+        inputs.push({ key, val: patch[key] });
+      }
+    }
+    if (sets.length === 0) return findUserById(userId);
+    await db.pool.request()
+      .input('id', db.sql.NVarChar, userId)
+      .query(`UPDATE users SET ${sets.join(', ')} WHERE id=@id`, ...inputs.map(i => ({ name: i.key, type: db.sql.NVarChar, value: i.val })));
+    return findUserById(userId);
+  }
+  const u = mem.users.find((x) => x.id === userId);
+  if (!u) { const e = new Error('User not found.'); e.code = 404; throw e; }
+  const allowed = ['name', 'mobile', 'address', 'pinCode', 'useCurrentLocation'];
+  for (const key of allowed) if (patch[key] !== undefined) u[key] = patch[key];
+  return u;
+}
+
 async function partnerCounts(providerId) {
   const all = (await allJobs()).filter((j) => j.providerId === providerId);
   return { requests: all.filter((j) => j.status === 'new').length };
@@ -851,5 +874,5 @@ module.exports = {
   getOverview, listCustomers, listProviders, listBookingsAdmin, listWalletAdmin,
   listAudit, listTicketsAdmin, replyTicket, listComplaints, updateComplaint,
   getLoyaltyAdmin, listInsights, listExports, createExport, adminCounts,
-  updateOverdueBookings,
+  updateOverdueBookings, updateUserProfile,
 };
