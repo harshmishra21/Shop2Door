@@ -674,13 +674,15 @@ async function updateUserProfile(userId, patch) {
     for (const key of allowed) {
       if (patch[key] !== undefined) {
         sets.push(`${key}=@${key}`);
-        inputs.push({ key, val: patch[key] });
+        const val = patch[key];
+        const type = key === 'useCurrentLocation' ? db.sql.Bit : db.sql.NVarChar;
+        inputs.push({ key, type, val: key === 'useCurrentLocation' ? (val ? 1 : 0) : val });
       }
     }
     if (sets.length === 0) return findUserById(userId);
     await db.pool.request()
       .input('id', db.sql.NVarChar, userId)
-      .query(`UPDATE users SET ${sets.join(', ')} WHERE id=@id`, ...inputs.map(i => ({ name: i.key, type: db.sql.NVarChar, value: i.val })));
+      .query(`UPDATE users SET ${sets.join(', ')} WHERE id=@id`, ...inputs.map(i => ({ name: i.key, type: i.type, value: i.val })));
     return findUserById(userId);
   }
   const u = mem.users.find((x) => x.id === userId);
